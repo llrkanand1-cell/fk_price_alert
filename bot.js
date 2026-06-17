@@ -443,4 +443,7 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
     } catch (err) {}
 }
 
-bot.launch().then(() => console.log("Spy Control Pro Stable Layout Live..."));
+// 🔥 FORCE FLUSH SPECIFIC POLLING TO CLEAR CONFLICTS ON BOOT
+bot.telegram.deleteWebhook().then(() => {
+    bot.launch().then(() => console.log("Spy Control Pro Stable Layout Live..."));
+});
