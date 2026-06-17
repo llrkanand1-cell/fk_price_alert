@@ -241,3 +241,4 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
         }
     } catch (err) {}
 }
+            
