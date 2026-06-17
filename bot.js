@@ -5,9 +5,9 @@ const fs = require('fs');
 const path = require('path');
 
 // --- 🔒 CONFIGURATION HARDLOCKED ---
-const BOT_TOKEN = '8980239383:AAFwZVEzP0lTYoIG3-HYig4xTz47L1n0lXY'; // Aapka exact correct token
+const BOT_TOKEN = '8980239383:AAFwZVEzP0lTYoIG3-HYig4xTz47L1n0lXY'; 
 const ADMIN_CHAT_ID = '7485181331'; 
-const CHECK_INTERVAL = 30000; // 30 second precision loop
+const CHECK_INTERVAL = 15000; // 15 Seconds Loop
 const RENDER_URL = 'https://fk-financial-tracker.onrender.com'; 
 const DB_FILE = path.join(__dirname, 'database.json');
 // ----------------------------------------
@@ -55,7 +55,6 @@ function isUserApproved(userId) {
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// Webhook for Render stability
 app.use(bot.webhookCallback('/secret-telegram-webhook'));
 
 app.get('/', (req, res) => res.status(200).send('Financial Core Engine Webhook Live!'));
@@ -74,7 +73,7 @@ app.listen(PORT, '0.0.0.0', async () => {
 
 setInterval(() => {
     axios.get(RENDER_URL).catch(() => {}); 
-}, 30000); 
+}, 15000); 
 
 const getProKeyboard = () => {
     return Markup.keyboard([
@@ -110,35 +109,28 @@ bot.hears('🛵 Track Bank', (ctx) => {
 bot.hears('📋 List Active', (ctx) => { displayActiveTracks(ctx); });
 bot.hears('🛑 Stop All Operations', (ctx) => { killAllOperations(ctx); });
 
-// 🔥 HIGH-PRECISION TEXT TEXT COMMAND INTERCEPTOR FOR /stop1, /stop2, etc.
 bot.on('text', async (ctx, next) => {
     const userId = ctx.from.id.toString();
     if (!isUserApproved(userId)) return;
 
     const textInput = ctx.message.text.trim().toLowerCase();
 
-    // Agar text "/stop" se shuru ho raha hai (jaise /stop1, /stop2)
     if (textInput.startsWith('/stop') && textInput !== '/stop_all') {
         const chatId = ctx.chat.id.toString();
-        
-        // Piche ka number nikalne ke liye
         const numStr = textInput.replace('/stop', '').trim();
-        const index = parseInt(numStr) - 1; // Array 0 se shuru hota hai
+        const index = parseInt(numStr) - 1;
 
         if (isNaN(index) || !activeUsers[chatId] || !activeUsers[chatId][index]) {
             return ctx.reply("⚠️ **Galat Target Number!** Pehle `📋 List Active` check karo boss.");
         }
 
         const removedItem = activeUsers[chatId][index];
-        
-        // Loop clear karo aur array se delete karo
         clearInterval(removedItem.interval);
         activeUsers[chatId].splice(index, 1);
 
         return ctx.reply(`🛑 <b>Target [${index + 1}] radar se permanent saaf!</b>\nTracking successfully stopped for:\n<code>${removedItem.url}</code>`, { parse_mode: 'HTML', disable_web_page_preview: true });
     }
 
-    // Baaki normal flow chalne do
     if (['🚀 track both', '🛵 track bank', '📋 list active', '🛑 stop all operations'].includes(textInput)) return;
 
     if (userSessions[userId]) {
@@ -164,11 +156,10 @@ function setupCoreScraperSystem(ctx, fkLink, mode, modeLabel) {
         id: pid, url: fkLink, mode: modeLabel, interval: intervalId, lastPrice: null, lastOffers: null
     });
 
-    ctx.reply(`🕵️‍♂️ **Undercover Agent Active!**\n\nTracking shuru ho gayi hai boss!`);
+    ctx.reply(`🕵️‍♂️ **Undercover Agent Active!**\n\nSelling Price check locked hai boss!`);
     checkFinancialFluctuations(ctx, chatId, pid, fkLink, mode);
 }
 
-// 🔥 FIXED UI: Ab har active link ke sath uski direct /stop command dikhegi
 function displayActiveTracks(ctx) {
     const chatId = ctx.chat.id.toString();
     if (!activeUsers[chatId] || activeUsers[chatId].length === 0) return ctx.reply("😴 Koyi active target radar par nahi hai.");
@@ -197,40 +188,54 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
 
     try {
         const response = await axios.get(originalUrl, {
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36' },
+            headers: { 
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                'Accept-Language': 'en-US,en;q=0.9'
+            },
             timeout: 12000 
         });
         const html = response.data;
+        
+        // 🔥 STRICT SELLING PRICE FILTER: Mails only the active deal value, totally bypasses raw MRP
         let currentPrice = "N/A";
-        const priceMatch = html.match(/"price"\s*:\s*"?([0-9]+)"?/i);
-        if (priceMatch) currentPrice = priceMatch[1];
+        const sellingPriceMatch = html.match(/"sellingPrice"\s*:\s*([0-9]+)/i) || 
+                                  html.match(/"specialPrice"\s*:\s*([0-9]+)/i) ||
+                                  html.match(/"price"\s*:\s*"?([0-9]+)"?/i);
+                                  
+        if (sellingPriceMatch) currentPrice = sellingPriceMatch[1];
 
+        // Strict Bank Offers Parser
         let currentOffersRaw = [];
         const offerRegex = /(?:bank offer|instant discount| cashback|off on credit card|off on debit card)[^<"']+/gi;
         let match;
-        let combinedOffersText = "";
-        while ((match = offerRegex.exec(html)) !== null && currentOffersRaw.length < 4) {
-            let cleanOffer = match[0].replace(/<\/?[^>]+(>|$)/g, "").trim();
-            if (cleanOffer.length > 15 && cleanOffer.length < 100 && !currentOffersRaw.includes(cleanOffer)) {
+        while ((match = offerRegex.exec(html)) !== null && currentOffersRaw.length < 5) {
+            let cleanOffer = match[0].replace(/<\/?[^>]+(>|$)/g, "").replace(/\s+/g, " ").trim();
+            if (cleanOffer.length > 15 && cleanOffer.length < 90 && !currentOffersRaw.includes(cleanOffer)) {
                 currentOffersRaw.push(cleanOffer);
-                combinedOffersText += `🔹 ${cleanOffer}\n`;
             }
         }
+        
+        currentOffersRaw.sort();
+        let combinedOffersText = currentOffersRaw.map(o => `🔹 ${o}`).join('\n');
         if (!combinedOffersText) combinedOffersText = "No active bank offers detected.";
 
         let instance = activeUsers[chatId][itemIndex];
+        
         if (instance.lastPrice === null) {
             instance.lastPrice = currentPrice;
             instance.lastOffers = combinedOffersText;
             return;
         }
 
-        if ((mode === 'both' && currentPrice !== instance.lastPrice) || combinedOffersText !== instance.lastOffers) {
+        let priceChanged = (mode === 'both' && currentPrice !== instance.lastPrice && currentPrice !== "N/A");
+        let offersChanged = (combinedOffersText !== instance.lastOffers);
+
+        if (priceChanged || offersChanged) {
             instance.lastPrice = currentPrice;
             instance.lastOffers = combinedOffersText;
 
             await bot.telegram.sendMessage(chatId, 
-                `🔥 <b>Oo bhaiiii badal gya hai snapshot!</b> 🔥\n\n💰 Price: <b>₹${currentPrice}</b>\n🏛️ Bank Offers:\n${combinedOffersText}\nLink:\n${originalUrl}\n\n🛑 Stop instant: /stop${itemIndex + 1}`,
+                `🔥 <b>Oo bhaiiii badal gya hai snapshot!</b> 🔥\n\n💰 Live Price: <b>₹${currentPrice}</b>\n🏛️ Bank Offers:\n${combinedOffersText}\nLink:\n${originalUrl}\n\n🛑 Stop instant: /stop${itemIndex + 1}`,
                 { parse_mode: 'HTML' }
             ).catch(() => {});
         }
