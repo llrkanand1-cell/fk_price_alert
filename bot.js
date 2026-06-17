@@ -119,8 +119,7 @@ bot.start((ctx) => {
     }).catch(() => {});
 });
 
-// --- 🔥 HIGH-PRIORITY COMMANDS SECTION (ORDER FIXED!) ---
-
+// --- 🔥 ADMIN COMMANDS ---
 bot.command('approve', (ctx) => {
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
         return ctx.reply("❌ **Warning! Identity Verification Failed.**\nAbe shaane, yeh command sirf asli Loot Master (Admin) ke fingerprint par khulti hai. Chal peeche hatt! 👮‍♂️🔥");
@@ -186,13 +185,13 @@ bot.command('remove_user', async (ctx) => {
     }
 });
 
-// TRACKING COMMANDS LINKS
+// --- TRACKING LINKING PLATFORM COMMANDS ---
 bot.command('track_both', async (ctx) => { handleLegacyCommands(ctx, 'both', 'Price + Deep Bank Offers'); });
 bot.command('track_bank', async (ctx) => { handleLegacyCommands(ctx, 'bankonly', 'Only Deep Bank Offers'); });
 bot.command('list_track', (ctx) => { displayActiveTracks(ctx); });
 bot.command('stop_all', (ctx) => { killAllOperations(ctx); });
 
-// PANEL HEARS REGISTERED SAFELY
+// PANEL HEARS REGISTERED
 bot.hears('🚀 Track Both', (ctx) => {
     const userId = ctx.from.id.toString();
     if (!isUserApproved(userId)) return;
@@ -211,7 +210,7 @@ bot.hears('📋 List Active', (ctx) => { displayActiveTracks(ctx); });
 bot.hears('🛑 Stop All Operations', (ctx) => { killAllOperations(ctx); });
 
 
-// --- 🧠 SMART TEXT INTERCEPTOR ENGINE ---
+// --- 🧠 FIXED SMART TEXT INTERCEPTOR SYSTEM ---
 bot.on('text', async (ctx) => {
     const userId = ctx.from.id.toString();
     const chatId = ctx.chat.id.toString();
@@ -219,25 +218,30 @@ bot.on('text', async (ctx) => {
 
     const textInput = ctx.message.text.trim();
 
-    // 1. Agar user ne command ya panel button dabaya ho toh interceptor ignore karega
+    // Skip Buttons strings and command formats
     if (['🚀 Track Both', '🛵 Track Bank', '📋 List Active', '🛑 Stop All Operations'].includes(textInput)) return;
     if (textInput.startsWith('/')) return;
 
-    // 2. 🔥 SMART SHORTCUT: stop 1, stop 2, stop 3 logic handles here
+    // 🔥 SMART SHORTCUT: "stop 1", "stop 2" handler fixed formatting
     const stopMatch = textInput.match(/^stop\s+(\d+)$/i);
     if (stopMatch) {
-        const targetIndex = parseInt(stopMatch[1]) - 1; // Array Index 0 se start hota hai
-        if (activeUsers[chatId] && activeUsers[chatId][targetIndex]) {
-            const removedItem = activeUsers[chatId][targetIndex];
-            clearInterval(removedItem.interval); // Loop band karo
-            activeUsers[chatId].splice(targetIndex, 1); // Matrix se udao
+        const targetIndex = parseInt(stopMatch[1]) - 1;
+        
+        // Dono formats check karo: chatId aur userId string
+        const currentActiveList = activeUsers[chatId] || activeUsers[userId];
+        const activeKey = activeUsers[chatId] ? chatId : userId;
+
+        if (currentActiveList && currentActiveList[targetIndex]) {
+            const removedItem = currentActiveList[targetIndex];
+            clearInterval(removedItem.interval); // Stop loop
+            activeUsers[activeKey].splice(targetIndex, 1); // Delete from RAM array
             return ctx.reply(`🛑 Ok boss, tracking band kar di item number **${targetIndex + 1}** ki:\n${removedItem.url}`, { parse_mode: 'Markdown', disable_web_page_preview: true });
         } else {
-            return ctx.reply(`⚠️ Bhai, is number (**${targetIndex + 1}**) par koi active target radar par nahi mila. \`📋 List Active\` check karo.`);
+            return ctx.reply(`⚠️ Bhai, is number (**${targetIndex + 1}**) par koi active target radar par nahi mila. \`📋 List Active\` daba kar matrix dekho.`);
         }
     }
 
-    // 3. Normal URL Tracker interceptor block
+    // Process incoming link tracker
     if (userSessions[userId]) {
         const mode = userSessions[userId];
         const modeLabel = mode === 'both' ? 'Price + Deep Bank Offers' : 'Only Deep Bank Offers';
@@ -269,6 +273,7 @@ function handleLegacyCommands(ctx, mode, modeLabel) {
 
 function setupCoreScraperSystem(ctx, fkLink, mode, modeLabel) {
     const chatId = ctx.chat.id.toString();
+    const userId = ctx.from.id.toString();
     
     let pid = "";
     try {
@@ -282,12 +287,14 @@ function setupCoreScraperSystem(ctx, fkLink, mode, modeLabel) {
     }
     if (!pid) pid = Buffer.from(fkLink).toString('base64').substring(0, 10);
 
+    // Initial setup for both tracking keys to avoid data missing
     if (!activeUsers[chatId]) activeUsers[chatId] = [];
+    
     if (activeUsers[chatId].some(item => item.id === pid)) return ctx.reply("⚠️ Abe ye target pehle se hi radar par locked hai!");
 
     const intervalId = setInterval(() => { checkFinancialFluctuations(ctx, chatId, pid, fkLink, mode); }, CHECK_INTERVAL);
 
-    activeUsers[chatId].push({
+    const trackingObject = {
         id: pid,
         url: fkLink,
         mode: modeLabel,
@@ -296,21 +303,30 @@ function setupCoreScraperSystem(ctx, fkLink, mode, modeLabel) {
         lastPrice: null,
         lastOffers: null,
         lastOffersRaw: []
-    });
+    };
+
+    activeUsers[chatId].push(trackingObject);
 
     ctx.reply(`🕵️‍♂️ **Undercover Agent Active!**\n\nBhai, tu Flipkart waalon ke liye ek "secret spy" chhod raha hai. \n\n☕ Chal ab tu aaram se jaake **chai-wai piyo ya mast neend poori karo**, unki lanka lagane ka kaam tere bhai par locked hai! 💣🚀`);
 
     checkFinancialFluctuations(ctx, chatId, pid, fkLink, mode);
 }
 
+// --- 🔥 FIXED DISPLAY ACTIVE TRACKS (CHUN CHUN KAR DATA FETCH KAREGA) ---
 function displayActiveTracks(ctx) {
     const userId = ctx.from.id.toString();
-    if (!isUserApproved(userId)) return;
     const chatId = ctx.chat.id.toString();
-    if (!activeUsers[chatId] || activeUsers[chatId].length === 0) return ctx.reply("😴 Abhi koi target radar par nahi hai, sab shant hai.");
+    if (!isUserApproved(userId)) return;
+    
+    // Memory fetch fallbacks
+    const currentList = activeUsers[chatId] || activeUsers[userId] || [];
+    
+    if (currentList.length === 0) {
+        return ctx.reply("😴 Abhi koi target radar par nahi hai, sab shant hai.");
+    }
     
     let msg = "📋 **Radar Par Locked Targets Matrix:**\n\n";
-    activeUsers[chatId].forEach((item, index) => {
+    currentList.forEach((item, index) => {
         msg += `*${index + 1}.* 📦 **ID:** \`${item.id}\` \n⚙️ **Mode:** \`[${item.mode}]\` \n🔗 **Link:** ${item.url}\n👉 *Band karne ke liye likhein:* \`stop ${index + 1}\` \n\n`;
     });
     ctx.reply(msg, { parse_mode: 'Markdown', disable_web_page_preview: true });
@@ -318,19 +334,25 @@ function displayActiveTracks(ctx) {
 
 function killAllOperations(ctx) {
     const userId = ctx.from.id.toString();
-    if (!isUserApproved(userId)) return;
     const chatId = ctx.chat.id.toString();
-    if (activeUsers[chatId] && activeUsers[chatId].length > 0) {
-        activeUsers[chatId].forEach(item => clearInterval(item.interval));
+    if (!isUserApproved(userId)) return;
+    
+    const targets = activeUsers[chatId] || activeUsers[userId] || [];
+    
+    if (targets.length > 0) {
+        targets.forEach(item => clearInterval(item.interval));
         delete activeUsers[chatId];
+        delete activeUsers[userId];
         ctx.reply("🛑 Saare undercover agents ko headquarter wapas bula liya gya hai! Matrix cleared.");
-    } else { ctx.reply("⚠️ Koyi active operation chal hi nahi rahi."); }
+    } else { 
+        ctx.reply("⚠️ Koyi active operation chal hi nahi rahi."); 
+    }
 }
 
 // --- 🔬 CORE BREAKDOWN SCRAPER ENGINE ---
 async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
-    if (!activeUsers[chatId]) return;
-    const itemIndex = activeUsers[chatId].findIndex(item => item.id === pid);
+    const currentList = activeUsers[chatId] || [];
+    const itemIndex = currentList.findIndex(item => item.id === pid);
     if (itemIndex === -1) return;
 
     try {
@@ -378,7 +400,7 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
         }
         if (!combinedOffersText) combinedOffersText = "No active bank offers detected on page.";
 
-        let instance = activeUsers[chatId][itemIndex];
+        let instance = currentList[itemIndex];
 
         if (instance.lastPrice === null && instance.lastOffers === null) {
             instance.lastPrice = currentPrice;
@@ -444,4 +466,4 @@ bot.launch({
     polling: {
         dropPendingUpdates: true 
     }
-}).then(() => console.log("Spy Control Pro Engine Fully Operational..."));
+}).then(() => console.log("Spy Control Pro Clean Setup Live..."));
