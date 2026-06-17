@@ -85,7 +85,9 @@ bot.on('callback_query', async (ctx) => {
             saveApprovedUsers(currentList);
         }
         await ctx.editMessageText(`${ctx.callbackQuery.message.text}\n\n✅ **Status: Approved Permanently!**`).catch(() => {});
-        await bot.telegram.sendMessage(targetUserId, "🎉 **Mubarak ho! Admin ne aapka access approve kar diya hai!**\n\n👉 Commands:\n💰 Price + Bank: \`/track_both <URL>\`\n💳 Only Bank: \`/track_bank <URL>\`", { parse_mode: 'Markdown' }).catch(() => {});
+        
+        // 🔥 FIXED: Request approve hone ke baad ab sirf clean commands aur unke aage unke functions likhe hain!
+        await bot.telegram.sendMessage(targetUserId, "🎉 **Mubarak ho! Admin ne aapka access approve kar diya hai!**\n\n👉 **Bot Commands Matrix:**\n💰 /track_both — Price + Bank Offers Monitor\n💳 /track_bank — Only Bank Offers Alert\n📋 /list_track — Active tracking matrix\n🛑 /stop_all — Clear all tracking", { parse_mode: 'Markdown' }).catch(() => {});
     } else if (data.startsWith('decline_')) {
         await ctx.editMessageText(`${ctx.callbackQuery.message.text}\n\n❌ **Status: Declined!**`).catch(() => {});
     }
@@ -98,7 +100,8 @@ bot.start((ctx) => {
     const name = `${ctx.from.first_name || ''}`.trim();
     
     if (isUserApproved(userId)) {
-        return ctx.reply(`🤖 *Welcome ${name}!* Fixed Financial Tracker Live!\n\n🔹 **Commands:**\n🚀 \`/track_both <Flipkart_URL>\` — Price + Bank Offers Monitor\n🛵 \`/track_bank <Flipkart_URL>\` — Only Bank Offers Alert\n📋 \`/list_track\` — Active tracking matrix\n🛑 \`/stop_all\` — Clear all tracking`, { parse_mode: 'Markdown' });
+        // 🔥 FIXED: /start command ke andar se bhi URL tags ko clean kar diya hai
+        return ctx.reply(`🤖 *Welcome ${name}!* Fixed Financial Tracker Live!\n\n🔹 **Commands Matrix:**\n🚀 \`/track_both\` — Price + Bank Offers Monitor\n🛵 \`/track_bank\` — Only Bank Offers Alert\n📋 \`/list_track\` — Active tracking matrix\n🛑 \`/stop_all\` — Clear all tracking`, { parse_mode: 'Markdown' });
     }
     
     ctx.reply(`🔒 **Access Denied!** ID: \`${userId}\` \nAdmin ke paas request bhej di gayi hai.`);
@@ -118,7 +121,8 @@ function setupTrackingEngine(ctx, mode, modeLabel) {
     const args = ctx.message.text.replace(/\n/g, ' ').split(' ').filter(arg => arg.trim() !== '');
     
     let fkLink = args.find(arg => arg.includes('flipkart.com/'));
-    if (!fkLink) return ctx.reply(`❌ Format error! Type karein:\n\`/${ctx.command} <Flipkart_URL>\``, { parse_mode: 'Markdown' });
+    // 🔥 FIXED: Format error error instruction me se bhi tag saaf kar diya
+    if (!fkLink) return ctx.reply(`❌ Format error! Command ke aage link space dekar bhejein. Example:\n\`/${ctx.command} https://flipkart.com/...\``, { parse_mode: 'Markdown' });
     
     let pid = "";
     try {
@@ -148,7 +152,6 @@ function setupTrackingEngine(ctx, mode, modeLabel) {
         lastOffersRaw: []
     });
 
-    // 🔥 FUNNY CONFIRMATION MESSAGE (Sirf ek baar link daalne pr aayega, fir background me chupchap chalega)
     ctx.reply(`🎯 **Link Lock Ho Gya Bhai!**\n\n☕ Chal ab tu aaram se jaake **chai-wai piyo ya mast apni neend poori karo**, cheetah jaisi nazar laga di hai tere bhai ne. Jaise hi thoda sa bhi fluctuation hoga, tera bhai tere kaan ke neeche **alert baja baja kar** tujhe jaga dega! 😎🚀`);
 
     checkFinancialFluctuations(ctx, chatId, pid, fkLink, mode);
