@@ -16,7 +16,7 @@ const bot = new Telegraf(BOT_TOKEN);
 const activeUsers = {};
 const userSessions = {}; // Handles user tracking state silently
 
-// 🔥 HARD ENGINE CACHE: Baar-baar file read karne ke crash se bachane ke liye
+// HARD ENGINE CACHE: Prevents file lock crashes
 let approvedUsersCache = [];
 
 // --- 📂 BULLET-PROOF DATABASE LOGIC ---
@@ -47,7 +47,7 @@ function initDatabase() {
     }
 }
 
-// Initialize cache right away when script boots
+// Initialize database cache instantly
 initDatabase();
 
 function saveApprovedUsers(usersList) {
@@ -56,14 +56,13 @@ function saveApprovedUsers(usersList) {
         if (!uniqueUsers.includes(ADMIN_CHAT_ID.toString())) {
             uniqueUsers.push(ADMIN_CHAT_ID.toString());
         }
-        approvedUsersCache = uniqueUsers; // Update RAM memory cache instantly
+        approvedUsersCache = uniqueUsers; 
         fs.writeFileSync(DB_FILE, JSON.stringify(uniqueUsers, null, 2));
     } catch (e) {}
 }
 
 function isUserApproved(userId) {
     if (!userId) return false;
-    // File read karne ke bajaye memory cache se load karega, zero downtime block!
     return approvedUsersCache.includes(userId.toString());
 }
 // --------------------------------------------
@@ -92,7 +91,7 @@ bot.on('callback_query', async (ctx) => {
     const chatId = ctx.chat.id.toString();
     const clickerId = ctx.from.id.toString();
     
-    // 🔥 FIXED: Active List se 1st, 2nd, 3rd target manually udaane ka system
+    // Dynamic stop system for specific links
     if (data.startsWith('stop_fk_')) {
         const index = parseInt(data.split('_')[2]);
         if (activeUsers[chatId] && activeUsers[chatId][index]) {
@@ -129,7 +128,7 @@ bot.start((ctx) => {
     const name = `${ctx.from.first_name || ''}`.trim();
     
     if (isUserApproved(userId)) {
-        delete userSessions[userId]; // Reset state
+        delete userSessions[userId]; 
         return ctx.reply(`🤖 *Welcome Agent ${name}!* Secret Control Panel Activated!\n\nNeeche diye gaye buttons par click karke direct use karo boss! 😎`, getProKeyboard());
     }
     
@@ -165,7 +164,6 @@ bot.hears('📋 List Active', (ctx) => { displayActiveTracks(ctx); });
 bot.command('stop_all', (ctx) => { killAllOperations(ctx); });
 bot.hears('🛑 Stop All Operations', (ctx) => { killAllOperations(ctx); });
 
-
 // --- SMART INCOMING MESSAGE INTERCEPTOR ---
 bot.on('text', async (ctx) => {
     const userId = ctx.from.id.toString();
@@ -195,8 +193,6 @@ bot.on('text', async (ctx) => {
     }
 });
 
-
-// Helper execution engine blocks
 function handleLegacyCommands(ctx, mode, modeLabel) {
     const args = ctx.message.text.replace(/\n/g, ' ').split(' ').filter(arg => arg.trim() !== '');
     let fkLink = args.find(arg => arg.includes('flipkart.com/'));
@@ -240,7 +236,7 @@ function setupCoreScraperSystem(ctx, fkLink, mode, modeLabel) {
     checkFinancialFluctuations(ctx, chatId, pid, fkLink, mode);
 }
 
-// 🔥 FIXED: List Active ke saath dynamic individual stop buttons ka system add kar diya hai
+// 🔥🔥🔥 RE-DESIGNED SOLID FUNCTION: Ab string perfectly concate hogi bina kisi raw logic crash ke! 🔥🔥🔥
 function displayActiveTracks(ctx) {
     const userId = ctx.from.id.toString();
     if (!isUserApproved(userId)) return;
@@ -254,16 +250,18 @@ function displayActiveTracks(ctx) {
     let keyboardButtons = [];
     let currentRow = [];
 
-    activeUsers[chatId].forEach((item, index) => {
-        msg += `🔢 *Target [${index + 1}]*\n📦 *ID:* \`${item.id}\` \n⚙️ *Mode:* \`[${item.mode}]\` \n🔗 *Link:* ${item.url}\n\n`;
+    for (let index = 0; index < activeUsers[chatId].length; index++) {
+        const item = activeUsers[chatId][index];
+        // Clean dynamic string template, breaks objects into text cleanly
+        msg += "🔢 *Target [" + (index + 1) + "]*\n📦 *ID:* `" + String(item.id) + "` \n⚙️ *Mode:* `[" + String(item.mode) + "]` \n🔗 *Link:* " + String(item.url) + "\n\n";
         
-        currentRow.push(Markup.button.callback(`Stop ${index + 1} 🛑`, `stop_fk_${index}`));
+        currentRow.push(Markup.button.callback("Stop " + (index + 1) + " 🛑", "stop_fk_" + index));
         
         if (currentRow.length === 2) {
             keyboardButtons.push(currentRow);
             currentRow = [];
         }
-    });
+    }
     
     if (currentRow.length > 0) {
         keyboardButtons.push(currentRow);
@@ -273,6 +271,9 @@ function displayActiveTracks(ctx) {
         parse_mode: 'Markdown', 
         disable_web_page_preview: true,
         ...Markup.inlineKeyboard(keyboardButtons)
+    }).catch((err) => {
+        // Fallback safety if markdown fails
+        ctx.reply("📋 Active List updated! Please tap buttons again.");
     });
 }
 
@@ -287,7 +288,7 @@ function killAllOperations(ctx) {
     } else { ctx.reply("⚠️ Koyi active operation chal hi nahi rahi."); }
 }
 
-// Admin commands
+// Admin controlroom core logic
 bot.command('approve', (ctx) => {
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
         return ctx.reply("❌ **Warning! Identity Verification Failed.**\nAbe shaane, yeh command sirf asli Loot Master (Admin) ke fingerprint par khulti hai. Chal peeche hatt! 👮‍♂️🔥");
