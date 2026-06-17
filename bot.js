@@ -72,16 +72,19 @@ bot.on('callback_query', async (ctx) => {
     const chatId = ctx.chat.id.toString();
     const clickerId = ctx.from.id.toString();
     
+    // HANDLING DYNAMIC TARGET RECOVERY FROM ACTIVE LIST (Stop 1st, 2nd, 3rd)
     if (data.startsWith('stop_fk_')) {
         const index = parseInt(data.split('_')[2]);
         if (activeUsers[chatId] && activeUsers[chatId][index]) {
             const removedItem = activeUsers[chatId][index];
             clearInterval(removedItem.interval);
             activeUsers[chatId].splice(index, 1);
-            await ctx.answerCbQuery("Tracking band kar di gayi hai! 🛑").catch(() => {});
-            return ctx.reply(`🛑 Ok boss, tracking band kar di is link ki:\n${removedItem.url}`, { disable_web_page_preview: true });
+            await ctx.answerCbQuery("Target Radar Se Deleted! 🛑").catch(() => {});
+            
+            await ctx.editMessageText(`🛑 **Mission Aborted!** Undercover agent ko is link se permanent wapas bula liya gaya hai:\n${removedItem.url}`, { disable_web_page_preview: true }).catch(() => {});
+            return;
         }
-        return ctx.answerCbQuery("⚠️ Already stopped.").catch(() => {});
+        return ctx.answerCbQuery("⚠️ Yeh target pehle se hi band ho chuka hai.").catch(() => {});
     }
 
     if (clickerId !== ADMIN_CHAT_ID.toString()) return ctx.answerCbQuery("❌ Unauthorized!").catch(() => {});
@@ -107,8 +110,8 @@ bot.start((ctx) => {
     const name = `${ctx.from.first_name || ''}`.trim();
     
     if (isUserApproved(userId)) {
-        delete userSessions[userId]; // Reset state
-        return ctx.reply(`🤖 *Welcome Agent ${name}!* Secret Control Panel Activated!\n\nNeeche diye gaye buttons par click karke direct use karo boss, ab kuch type karne ka jhanjhat nahi! 😎`, getProKeyboard());
+        delete userSessions[userId]; 
+        return ctx.reply(`🤖 *Welcome Agent ${name}!* Secret Control Panel Activated!\n\nNeeche diye gaye buttons par click karke direct use karo boss! 😎`, getProKeyboard());
     }
     
     ctx.reply(`🔒 **Radar Blocked! Access Denied.**\n\nBhai, tu abhi secret network se bahar hai. Teri Request ID: \`${userId}\` ko cipher karke Admin (Loot Master) ke Control Room mein bhej diya gaya hai. Jab tak woh wahan se green signal nahi dete, tab tak chupchaap wait kar! 🤫`, { parse_mode: 'Markdown' });
@@ -119,7 +122,7 @@ bot.start((ctx) => {
     }).catch(() => {});
 });
 
-// --- 🔥 FIXED: REMOVED THE UNNECESSARY INSTRUCTION LINE FROM BUTTONS 🔥 ---
+// --- KEYBOARD BUTTON TRIGGERS ---
 bot.hears('🚀 Track Both', (ctx) => {
     const userId = ctx.from.id.toString();
     if (!isUserApproved(userId)) return;
@@ -144,7 +147,7 @@ bot.command('stop_all', (ctx) => { killAllOperations(ctx); });
 bot.hears('🛑 Stop All Operations', (ctx) => { killAllOperations(ctx); });
 
 
-// --- 🔥 SMART INCOMING MESSAGE INTERCEPTOR ---
+// --- SMART INCOMING TEXT INTERCEPTOR ---
 bot.on('text', async (ctx) => {
     const userId = ctx.from.id.toString();
     if (!isUserApproved(userId)) return;
@@ -161,7 +164,7 @@ bot.on('text', async (ctx) => {
         let fkLink = args.find(arg => arg.includes('flipkart.com/'));
 
         if (!fkLink) {
-            return ctx.reply(`❌ **Abe saaf link bhejo Agent!**\nInput mein Flipkart ka link nahi mila. Dobara sahi se link bhejo ya pehle command select karo!`, getProKeyboard());
+            return ctx.reply(`❌ **Abe saaf link bhejo Agent!**\nInput mein Flipkart ka link nahi mila. Dobara bhejien!`, getProKeyboard());
         }
 
         setupCoreScraperSystem(ctx, fkLink, mode, modeLabel);
@@ -174,7 +177,7 @@ bot.on('text', async (ctx) => {
 });
 
 
-// Helper execution engine blocks
+// Helper core processors
 function handleLegacyCommands(ctx, mode, modeLabel) {
     const args = ctx.message.text.replace(/\n/g, ' ').split(' ').filter(arg => arg.trim() !== '');
     let fkLink = args.find(arg => arg.includes('flipkart.com/'));
@@ -222,13 +225,35 @@ function displayActiveTracks(ctx) {
     const userId = ctx.from.id.toString();
     if (!isUserApproved(userId)) return;
     const chatId = ctx.chat.id.toString();
-    if (!activeUsers[chatId] || activeUsers[chatId].length === 0) return ctx.reply("😴 Abhi koi target radar par nahi hai, sab shant hai.");
+    
+    if (!activeUsers[chatId] || activeUsers[chatId].length === 0) {
+        return ctx.reply("😴 Abhi koi target radar par nahi hai, sab shant hai.");
+    }
     
     let msg = "📋 **Radar Par Locked Targets Matrix:**\n\n";
+    let keyboardButtons = [];
+    let currentRow = [];
+
     activeUsers[chatId].forEach((item, index) => {
-        msg += `${index + 1}. 📦 **ID:** \`${item.id}\` \n⚙️ **Mode:** \`[${item.mode}]\` \n🔗 **Link:** ${item.url}\n\n`;
+        msg += `🔢 **Target [${index + 1}]**\n📦 **ID:** \`${item.id}\` \n⚙️ **Mode:** \`[${item.mode}]\` \n🔗 **Link:** ${item.url}\n\n`;
+        
+        currentRow.push(Markup.button.callback(`Stop ${index + 1} 🛑`, `stop_fk_${index}`));
+        
+        if (currentRow.length === 2) {
+            keyboardButtons.push(currentRow);
+            currentRow = [];
+        }
     });
-    ctx.reply(msg, { parse_mode: 'Markdown', disable_web_page_preview: true });
+    
+    if (currentRow.length > 0) {
+        keyboardButtons.push(currentRow);
+    }
+
+    ctx.reply(msg, { 
+        parse_mode: 'Markdown', 
+        disable_web_page_preview: true,
+        ...Markup.inlineKeyboard(keyboardButtons)
+    });
 }
 
 function killAllOperations(ctx) {
@@ -242,7 +267,7 @@ function killAllOperations(ctx) {
     } else { ctx.reply("⚠️ Koyi active operation chal hi nahi rahi."); }
 }
 
-// Admin commands with denied alerts
+// --- 🔥 ADMIN CONTROL ROOM COMMANDS 🔥 ---
 bot.command('approve', (ctx) => {
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
         return ctx.reply("❌ **Warning! Identity Verification Failed.**\nAbe shaane, yeh command sirf asli Loot Master (Admin) ke fingerprint par khulti hai. Chal peeche hatt! 👮‍♂️🔥");
@@ -270,6 +295,7 @@ bot.command('list_users', (ctx) => {
     ctx.reply(msg, { parse_mode: 'Markdown' });
 });
 
+// 🔥 REMOVE USER ABILITY: Admin can ban any user anytime completely
 bot.command('remove_user', (ctx) => {
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
         return ctx.reply("❌ **Warning! Identity Verification Failed.**\nAbe shaane, yeh command sirf asli Loot Master (Admin) ke fingerprint par khulti hai. Chal peeche hatt! 👮‍♂️🔥");
@@ -277,14 +303,29 @@ bot.command('remove_user', (ctx) => {
     const args = ctx.message.text.split(' ').filter(arg => arg.trim() !== '');
     if (args.length < 2) return ctx.reply("⚠️ Format: `/remove_user <user_id>`");
     const targetUserId = args[1].trim();
+    
+    if (targetUserId === ADMIN_CHAT_ID.toString()) {
+        return ctx.reply("⚠️ Abe khud ko hi thodi na remove kar doge master! 🤣");
+    }
+
     let currentList = loadApprovedUsers();
     const idx = currentList.indexOf(targetUserId);
     if (idx !== -1) {
         currentList.splice(idx, 1);
         saveApprovedUsers(currentList);
-        ctx.reply(`❌ Agent \`${targetUserId}\` ka licence permanent cancel kar diya gaya hai.`, { parse_mode: 'Markdown' });
+        
+        // Target user ka internal loop context state clean-up agar chal rha ho toh
+        if (activeUsers[targetUserId]) {
+            activeUsers[targetUserId].forEach(item => clearInterval(item.interval));
+            delete activeUsers[targetUserId];
+        }
+        
+        ctx.reply(`❌ Agent \`${targetUserId}\` ka licence permanent cancel kar diya gaya hai aur data wipe kar diya hai!`, { parse_mode: 'Markdown' });
+        
+        // Infom target user silently about de-authorization block
+        bot.telegram.sendMessage(targetUserId, "🔒 **Your session has been terminated by Admin.** Access revoked!").catch(() => {});
     } else {
-        ctx.reply("⚠️ Yeh ID agents ki list mein nahi mili.");
+        ctx.reply("⚠️ Yeh ID agents ki approved database list mein nahi mili.");
     }
 });
 
@@ -401,4 +442,4 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
     } catch (err) {}
 }
 
-bot.launch().then(() => console.log("Spy Control Pro Clean Setup Live..."));
+bot.launch().then(() => console.log("Spy Control Room System Fired Up..."));
