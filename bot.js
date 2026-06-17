@@ -1,5 +1,5 @@
 const { Telegraf, Markup } = require('telegraf');
-const axios = require('axios');
+const axios = require('express');
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
@@ -91,16 +91,19 @@ bot.on('callback_query', async (ctx) => {
     const chatId = ctx.chat.id.toString();
     const clickerId = ctx.from.id.toString();
     
-    // Dynamic stop system for specific links
+    // 🔥 FIXED: Ab button dabate hi wahi specific number ka stop message flash hoga!
     if (data.startsWith('stop_fk_')) {
         const index = parseInt(data.split('_')[2]);
         if (activeUsers[chatId] && activeUsers[chatId][index]) {
             const removedItem = activeUsers[chatId][index];
             clearInterval(removedItem.interval);
             activeUsers[chatId].splice(index, 1);
-            await ctx.answerCbQuery("Target Radar Se Deleted! 🛑").catch(() => {});
             
-            await ctx.editMessageText(`🛑 <b>Mission Aborted!</b> Undercover agent ko is link se permanent wapas bula liya gaya hai:<br>${removedItem.url}`, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(() => {});
+            // Pop up feedback in telegram
+            await ctx.answerCbQuery(`Target [${index + 1}] Stopped! 🛑`).catch(() => {});
+            
+            // Safe HTML string to update message status dynamically
+            await ctx.editMessageText(`🛑 <b>Target [${index + 1}] permanent saaf kar diya gaya hai!</b> Undercover agent ko is link se wapas bula liya:<br><code>${removedItem.url}</code>`, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(() => {});
             return;
         }
         return ctx.answerCbQuery("⚠️ Yeh target pehle se hi band ho chuka hai.").catch(() => {});
@@ -406,7 +409,7 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
             let addedOffers = currentOffersRaw.filter(x => !instance.lastOffersRaw.includes(x));
             let removedOffers = instance.lastOffersRaw.filter(x => !currentOffersRaw.includes(x));
 
-            let offerChangeMsg = `💳 <b>BANK OFFER TEXT/VALUE CHANGED:</b>\n`;
+            let offerChangeMsg = `CNB <b>BANK OFFER TEXT/VALUE CHANGED:</b>\n`;
             if (addedOffers.length > 0) {
                 offerChangeMsg += `✅ <b>Naya Offer Add Hua:</b>\n${addedOffers.map(o => `👉 ${o}`).join('\n')}\n`;
             }
@@ -443,7 +446,7 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
     } catch (err) {}
 }
 
-// 🔥 FORCE FLUSH SPECIFIC POLLING TO CLEAR CONFLICTS ON BOOT
+// FORCE FLUSH TO CLEAR DEPLOY CONFLICTS
 bot.telegram.deleteWebhook().then(() => {
     bot.launch().then(() => console.log("Spy Control Pro Stable Layout Live..."));
 });
