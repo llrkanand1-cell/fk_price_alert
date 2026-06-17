@@ -119,6 +119,83 @@ bot.start((ctx) => {
     }).catch(() => {});
 });
 
+// --- 🔥 ADMIN COMMANDS SECTION (PLACED BEFORE TEXT INTERCEPTOR) ---
+
+bot.command('approve', (ctx) => {
+    if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
+        return ctx.reply("❌ **Warning! Identity Verification Failed.**\nAbe shaane, yeh command sirf asli Loot Master (Admin) ke fingerprint par khulti hai. Chal peeche hatt! 👮‍♂️🔥");
+    }
+    const args = ctx.message.text.split(' ').filter(arg => arg.trim() !== '');
+    if (args.length < 2) return ctx.reply("⚠️ Format: `/approve <user_id>`");
+    const targetUserId = args[1].trim();
+    let currentList = loadApprovedUsers();
+    if (!currentList.includes(targetUserId)) {
+        currentList.push(targetUserId);
+        saveApprovedUsers(currentList);
+        ctx.reply(`✅ Agent \`${targetUserId}\` ko permanent mission access de diya gaya hai!`, { parse_mode: 'Markdown' });
+    } else {
+        ctx.reply("⚠️ Yeh ID pehle se hi approved list mein hai.");
+    }
+});
+
+bot.command('list_users', (ctx) => {
+    if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
+        return ctx.reply("❌ **Warning! Identity Verification Failed.**\nAbe shaane, yeh command sirf asli Loot Master (Admin) ke fingerprint par khulti hai. Chal peeche hatt! 👮‍♂️🔥");
+    }
+    const currentList = loadApprovedUsers();
+    let msg = "📋 **Approved Secret Agents Database List:**\n\n";
+    currentList.forEach(u => msg += `- \`${u}\`\n`);
+    ctx.reply(msg, { parse_mode: 'Markdown' });
+});
+
+// --- 🔥 GUARANTEED FIXED REMOVE USER COMMAND ---
+bot.command('remove_user', async (ctx) => {
+    if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
+        return ctx.reply("❌ **Warning! Identity Verification Failed.**\nAbe shaane, yeh command sirf asli Loot Master (Admin) ke fingerprint par khulti hai. Chal peeche hatt! 👮‍♂️🔥");
+    }
+
+    const args = ctx.message.text.split(' ').filter(arg => arg.trim() !== '');
+    if (args.length < 2) return ctx.reply("⚠️ Format: `/remove_user <user_id>`");
+    
+    const targetUserId = args[1].trim();
+    let currentList = loadApprovedUsers();
+    const idx = currentList.indexOf(targetUserId);
+    
+    if (idx !== -1) {
+        // 1. JSON Database se saaf karo
+        currentList.splice(idx, 1);
+        saveApprovedUsers(currentList);
+        
+        // 2. RAM Memory Cleanup - Dhat teri ki, saare active scrapers roko!
+        const idFormatsToClear = [targetUserId, targetUserId.toString()];
+        idFormatsToClear.forEach(id => {
+            if (activeUsers[id] && activeUsers[id].length > 0) {
+                activeUsers[id].forEach(item => {
+                    clearInterval(item.interval); 
+                });
+                delete activeUsers[id]; 
+            }
+        });
+        if (userSessions[targetUserId]) delete userSessions[targetUserId];
+
+        // 3. ✅ ADMIN KO CONFIRMATION REPLY (Ab 100% chalega!)
+        await ctx.reply(`✅ **Operation Successful!**\n\nAgent \`${targetUserId}\` ka access permanent cancel kar diya gaya hai aur uski saari tracking band ho chuki hai! ⚡💥`, { parse_mode: 'Markdown' });
+        
+        // 4. Target User Notification (Wrapped in try/catch taaki bot block hone par bot crash na ho)
+        bot.telegram.sendMessage(
+            targetUserId, 
+            "⚠️ **bhai admin ne tera access hata diya hai** 🚫\n\nAb aap is bot ke khufiya features aur control panel use nahi kar sakte.",
+            Markup.removeKeyboard() 
+        ).catch((e) => {
+            console.log("User has blocked the bot, notification skipped smoothly.");
+        });
+        
+    } else {
+        ctx.reply("⚠️ Yeh ID approved agents ki list mein nahi mili boss!");
+    }
+});
+
+// --- USER CONTROL PANEL HEARS ---
 bot.hears('🚀 Track Both', (ctx) => {
     const userId = ctx.from.id.toString();
     if (!isUserApproved(userId)) return;
@@ -150,7 +227,10 @@ bot.on('text', async (ctx) => {
 
     const textInput = ctx.message.text.trim();
 
+    // Ignore panel buttons strings
     if (['🚀 Track Both', '🛵 Track Bank', '📋 List Active', '🛑 Stop All Operations'].includes(textInput)) return;
+    // Ignore any commands starting with / so they don't get trapped here
+    if (textInput.startsWith('/')) return;
 
     if (userSessions[userId]) {
         const mode = userSessions[userId];
@@ -240,78 +320,6 @@ function killAllOperations(ctx) {
         ctx.reply("🛑 Saare undercover agents ko headquarter wapas bula liya gya hai! Matrix cleared.");
     } else { ctx.reply("⚠️ Koyi active operation chal hi nahi rahi."); }
 }
-
-bot.command('approve', (ctx) => {
-    if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
-        return ctx.reply("❌ **Warning! Identity Verification Failed.**\nAbe shaane, yeh command sirf asli Loot Master (Admin) ke fingerprint par khulti hai. Chal peeche hatt! 👮‍♂️🔥");
-    }
-    const args = ctx.message.text.split(' ').filter(arg => arg.trim() !== '');
-    if (args.length < 2) return ctx.reply("⚠️ Format: `/approve <user_id>`");
-    const targetUserId = args[1].trim();
-    let currentList = loadApprovedUsers();
-    if (!currentList.includes(targetUserId)) {
-        currentList.push(targetUserId);
-        saveApprovedUsers(currentList);
-        ctx.reply(`✅ Agent \`${targetUserId}\` ko permanent mission access de diya gaya hai!`, { parse_mode: 'Markdown' });
-    } else {
-        ctx.reply("⚠️ Yeh ID pehle se hi approved list mein hai.");
-    }
-});
-
-bot.command('list_users', (ctx) => {
-    if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
-        return ctx.reply("❌ **Warning! Identity Verification Failed.**\nAbe shaane, yeh command sirf asli Loot Master (Admin) ke fingerprint par khulti hai. Chal peeche hatt! 👮‍♂️🔥");
-    }
-    const currentList = loadApprovedUsers();
-    let msg = "📋 **Approved Secret Agents Database List:**\n\n";
-    currentList.forEach(u => msg += `- \`${u}\`\n`);
-    ctx.reply(msg, { parse_mode: 'Markdown' });
-});
-
-// --- 🔥 ONLY ADMIN CAN REMOVE USER (WITH TOTAL MEMORY PURGE & ADMIN CONFIRMATION) ---
-bot.command('remove_user', async (ctx) => {
-    if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
-        return ctx.reply("❌ **Warning! Identity Verification Failed.**\nAbe shaane, yeh command sirf asli Loot Master (Admin) ke fingerprint par khulti hai. Chal peeche hatt! 👮‍♂️🔥");
-    }
-
-    const args = ctx.message.text.split(' ').filter(arg => arg.trim() !== '');
-    if (args.length < 2) return ctx.reply("⚠️ Format: `/remove_user <user_id>`");
-    
-    const targetUserId = args[1].trim();
-    let currentList = loadApprovedUsers();
-    const idx = currentList.indexOf(targetUserId);
-    
-    if (idx !== -1) {
-        // 1. JSON Data Database clean up
-        currentList.splice(idx, 1);
-        saveApprovedUsers(currentList);
-        
-        // 2. RAM Memory Cleanup - Us bande ke chal rahe saare 30-sec interval task band karo
-        const idFormatsToClear = [targetUserId, targetUserId.toString()];
-        idFormatsToClear.forEach(id => {
-            if (activeUsers[id] && activeUsers[id].length > 0) {
-                activeUsers[id].forEach(item => {
-                    clearInterval(item.interval); 
-                });
-                delete activeUsers[id]; 
-            }
-        });
-        if (userSessions[targetUserId]) delete userSessions[targetUserId];
-
-        // 3. Admin Confirmation Reply
-        ctx.reply(`✅ **Operation Successful!**\n\nAgent \`${targetUserId}\` ka access cancel kar diya gaya hai aur uske tracking tasks destroy kar diye gaye hain! ⚡💥`, { parse_mode: 'Markdown' });
-        
-        // 4. Target User Jhatka Message
-        bot.telegram.sendMessage(
-            targetUserId, 
-            "⚠️ **bhai admin ne tera access hata diya hai** 🚫\n\nAb aap is bot ke khufiya features aur control panel use nahi kar sakte.",
-            Markup.removeKeyboard() 
-        ).catch(() => {});
-        
-    } else {
-        ctx.reply("⚠️ Yeh ID approved agents ki list mein nahi mili.");
-    }
-});
 
 // --- 🔬 CORE BREAKDOWN SCRAPER ENGINE ---
 async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
@@ -426,9 +434,8 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
     } catch (err) {}
 }
 
-// --- 🔥 FRESH CONFLICTLESS LAUNCH CONFIG 🔥 ---
 bot.launch({
     polling: {
-        dropPendingUpdates: true // Yeh line har restart par purane connection crash/conflict ko rokk degi
+        dropPendingUpdates: true 
     }
 }).then(() => console.log("Spy Control Pro Clean Setup Live..."));
