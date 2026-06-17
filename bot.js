@@ -98,9 +98,10 @@ bot.on('callback_query', async (ctx) => {
             const removedItem = activeUsers[chatId][index];
             clearInterval(removedItem.interval);
             activeUsers[chatId].splice(index, 1);
-            await ctx.answerCbQuery("Target Radar Se Deleted! 🛑").catch(() => {});
             
-            await ctx.editMessageText(`🛑 <b>Mission Aborted!</b> Undercover agent ko is link se permanent wapas bula liya gaya hai:<br>${removedItem.url}`, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(() => {});
+            await ctx.answerCbQuery(`Target [${index + 1}] Stopped! 🛑`).catch(() => {});
+            
+            await ctx.editMessageText(`🛑 <b>Target [${index + 1}] permanent saaf kar diya gaya hai!</b> Undercover agent ko is link se wapas bula liya:<br><code>${removedItem.url}</code>`, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(() => {});
             return;
         }
         return ctx.answerCbQuery("⚠️ Yeh target pehle se hi band ho chuka hai.").catch(() => {});
@@ -285,10 +286,10 @@ function killAllOperations(ctx) {
     } else { ctx.reply("⚠️ Koyi active operation chal hi nahi rahi."); }
 }
 
-// Admin controlroom core logic
+// --- 🔥 HARDLOCKED ADMIN VALIDATION SYSTEM 🔥 ---
 bot.command('approve', (ctx) => {
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
-        return ctx.reply("❌ **Warning! Identity Verification Failed.**\nAbe shaane, yeh command sirf asli Loot Master (Admin) ke fingerprint par khulti hai. Chal peeche hatt! 👮‍♂️🔥");
+        return ctx.reply("❌ **Access Denied!** Yeh command sirf asli Admin (Loot Master) hi chala sakta hai. 😎");
     }
     const args = ctx.message.text.split(' ').filter(arg => arg.trim() !== '');
     if (args.length < 2) return ctx.reply("⚠️ Format: `/approve <user_id>`");
@@ -297,7 +298,7 @@ bot.command('approve', (ctx) => {
     if (!approvedUsersCache.includes(targetUserId)) {
         approvedUsersCache.push(targetUserId);
         saveApprovedUsers(approvedUsersCache);
-        ctx.reply(`✅ Agent \`${targetUserId}\` ko permanent mission access de diya gaya hai!`, { parse_mode: 'Markdown' });
+        ctx.reply(`✅ Agent \`${targetUserId}\` ko permanent access de diya gaya hai!`, { parse_mode: 'Markdown' });
     } else {
         ctx.reply("⚠️ Yeh ID pehle se hi approved list mein hai.");
     }
@@ -305,7 +306,7 @@ bot.command('approve', (ctx) => {
 
 bot.command('list_users', (ctx) => {
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
-        return ctx.reply("❌ **Warning! Identity Verification Failed.**\nAbe shaane, yeh command sirf asli Loot Master (Admin) ke fingerprint par khulti hai. Chal peeche hatt! 👮‍♂️🔥");
+        return ctx.reply("❌ **Access Denied!** Yeh command sirf asli Admin (Loot Master) hi chala sakta hai. 😎");
     }
     let msg = "📋 **Approved Secret Agents Database List:**\n\n";
     approvedUsersCache.forEach(u => msg += `- \`${u}\`\n`);
@@ -313,20 +314,33 @@ bot.command('list_users', (ctx) => {
 });
 
 bot.command('remove_user', (ctx) => {
+    // 🔥 DOUBLE PROOF BLOCK FOR NON-ADMINS
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
-        return ctx.reply("❌ **Warning! Identity Verification Failed.**\nAbe shaane, yeh command sirf asli Loot Master (Admin) ke fingerprint par khulti hai. Chal peeche hatt! 👮‍♂️🔥");
+        return ctx.reply("❌ **Access Denied!** Yeh command sirf asli Admin (Loot Master) hi chala sakta hai. 😎");
     }
     const args = ctx.message.text.split(' ').filter(arg => arg.trim() !== '');
     if (args.length < 2) return ctx.reply("⚠️ Format: `/remove_user <user_id>`");
     const targetUserId = args[1].trim();
     
-    const idx = approvedUsersCache.indexOf(targetUserId);
+    if (targetUserId === ADMIN_CHAT_ID.toString()) {
+        return ctx.reply("⚠️ Abe khud ko hi thodi na remove kar doge master! 🤣");
+    }
+
+    let currentList = [...approvedUsersCache];
+    const idx = currentList.indexOf(targetUserId);
     if (idx !== -1) {
-        approvedUsersCache.splice(idx, 1);
-        saveApprovedUsers(approvedUsersCache);
-        ctx.reply(`❌ Agent \`${targetUserId}\` ka licence permanent cancel kar diya gaya hai.`, { parse_mode: 'Markdown' });
+        currentList.splice(idx, 1);
+        saveApprovedUsers(currentList);
+        
+        if (activeUsers[targetUserId]) {
+            activeUsers[targetUserId].forEach(item => clearInterval(item.interval));
+            delete activeUsers[targetUserId];
+        }
+        
+        ctx.reply(`❌ Agent \`${targetUserId}\` ka licence permanent cancel kar diya gaya hai aur system se data wipe kar diya hai!`, { parse_mode: 'Markdown' });
+        bot.telegram.sendMessage(targetUserId, "🔒 **Your session has been terminated by Admin.** Access revoked!").catch(() => {});
     } else {
-        ctx.reply("⚠️ Yeh ID agents ki list mein nahi mili.");
+        ctx.reply("⚠️ Yeh ID agents ki approved list mein nahi mili.");
     }
 });
 
@@ -443,7 +457,7 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
     } catch (err) {}
 }
 
-// 🔥 FORCE FLUSH SPECIFIC POLLING TO CLEAR CONFLICTS ON BOOT
+// FORCE FLUSH TO CLEAR DEPLOY CONFLICTS
 bot.telegram.deleteWebhook().then(() => {
     bot.launch().then(() => console.log("Spy Control Pro Stable Layout Live..."));
 });
