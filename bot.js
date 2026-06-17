@@ -85,8 +85,6 @@ bot.on('callback_query', async (ctx) => {
             saveApprovedUsers(currentList);
         }
         await ctx.editMessageText(`${ctx.callbackQuery.message.text}\n\n✅ **Status: Approved Permanently!**`).catch(() => {});
-        
-        // 🔥 FIXED: Approve hone ke baad saari commands perfectly underscore (_) format me clickeable jayengi!
         await bot.telegram.sendMessage(targetUserId, "🎉 **Mubarak ho! Admin ne aapka access approve kar diya hai!**\n\n👉 **Bot Commands Matrix:**\n💰 /track_both — Price + Bank Offers Monitor\n💳 /track_bank — Only Bank Offers Alert\n📋 /list_track — Active tracking matrix\n🛑 /stop_all — Clear all tracking", { parse_mode: 'Markdown' }).catch(() => {});
     } else if (data.startsWith('decline_')) {
         await ctx.editMessageText(`${ctx.callbackQuery.message.text}\n\n❌ **Status: Declined!**`).catch(() => {});
@@ -179,39 +177,49 @@ bot.command('stop_all', (ctx) => {
     } else { ctx.reply("⚠️ Koyi active tracking chal hi nahi rahi."); }
 });
 
-// Admin commands
+// --- 🔥 FIXED ADMIN VALIDATIONS WITH EXPLICIT DENIED MESSAGES 🔥 ---
 bot.command('approve', (ctx) => {
-    if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) return;
+    if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
+        return ctx.reply("❌ **Access Denied!** Yeh command sirf asli Admin hi chala sakta hai.");
+    }
     const args = ctx.message.text.split(' ').filter(arg => arg.trim() !== '');
-    if (args.length < 2) return;
+    if (args.length < 2) return ctx.reply("⚠️ Format: `/approve <user_id>`");
     const targetUserId = args[1].trim();
     let currentList = loadApprovedUsers();
     if (!currentList.includes(targetUserId)) {
         currentList.push(targetUserId);
         saveApprovedUsers(currentList);
-        ctx.reply(`✅ Approved ${targetUserId}`);
+        ctx.reply(`✅ User \`${targetUserId}\` ko permanent access de diya gaya hai!`, { parse_mode: 'Markdown' });
+    } else {
+        ctx.reply("⚠️ Yeh user pehle se hi approved hai.");
     }
 });
 
 bot.command('list_users', (ctx) => {
-    if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) return;
+    if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
+        return ctx.reply("❌ **Access Denied!** Yeh command sirf asli Admin hi chala sakta hai.");
+    }
     const currentList = loadApprovedUsers();
-    let msg = "📋 Approved Users:\n";
+    let msg = "📋 **Approved Users Database List:**\n\n";
     currentList.forEach(u => msg += `- \`${u}\`\n`);
     ctx.reply(msg, { parse_mode: 'Markdown' });
 });
 
 bot.command('remove_user', (ctx) => {
-    if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) return;
+    if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
+        return ctx.reply("❌ **Access Denied!** Yeh command sirf asli Admin hi chala sakta hai.");
+    }
     const args = ctx.message.text.split(' ').filter(arg => arg.trim() !== '');
-    if (args.length < 2) return;
+    if (args.length < 2) return ctx.reply("⚠️ Format: `/remove_user <user_id>`");
     const targetUserId = args[1].trim();
     let currentList = loadApprovedUsers();
     const idx = currentList.indexOf(targetUserId);
     if (idx !== -1) {
         currentList.splice(idx, 1);
         saveApprovedUsers(currentList);
-        ctx.reply(`❌ Removed ${targetUserId}`);
+        ctx.reply(`❌ User \`${targetUserId}\` ka access permanent khatam kar diya gaya hai.`, { parse_mode: 'Markdown' });
+    } else {
+        ctx.reply("⚠️ Yeh ID approved users ki list mein nahi mili.");
     }
 });
 
