@@ -100,7 +100,6 @@ bot.on('callback_query', async (ctx) => {
             activeUsers[chatId].splice(index, 1);
             await ctx.answerCbQuery("Target Radar Se Deleted! 🛑").catch(() => {});
             
-            // Fixed Live Update with safe HTML syntax
             await ctx.editMessageText(`🛑 <b>Mission Aborted!</b> Undercover agent ko is link se permanent wapas bula liya gaya hai:<br>${removedItem.url}`, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(() => {});
             return;
         }
@@ -237,7 +236,6 @@ function setupCoreScraperSystem(ctx, fkLink, mode, modeLabel) {
     checkFinancialFluctuations(ctx, chatId, pid, fkLink, mode);
 }
 
-// 🔥🔥🔥 ULTRA FIXED FUNCTION: HTML parsing used to avoid raw link crashes 🔥🔥🔥
 function displayActiveTracks(ctx) {
     const userId = ctx.from.id.toString();
     if (!isUserApproved(userId)) return;
@@ -253,8 +251,6 @@ function displayActiveTracks(ctx) {
 
     for (let index = 0; index < activeUsers[chatId].length; index++) {
         const item = activeUsers[chatId][index];
-        
-        // Strictly using safe HTML tags to enclose links cleanly
         msg += `🔢 <b>Target [${index + 1}]</b>\n📦 <b>ID:</b> <code>${item.id}</code>\n⚙️ <b>Mode:</b> <code>[${item.mode}]</code>\n🔗 <b>Link:</b> ${item.url}\n\n`;
         
         currentRow.push(Markup.button.callback(`Stop ${index + 1} 🛑`, `stop_fk_${index}`));
@@ -328,4 +324,123 @@ bot.command('remove_user', (ctx) => {
     if (idx !== -1) {
         approvedUsersCache.splice(idx, 1);
         saveApprovedUsers(approvedUsersCache);
-        ctx.reply(`❌ Agent \`${targetUserId}\` ka licence permanent cancel kar diya gaya hai.`, { parse_
+        ctx.reply(`❌ Agent \`${targetUserId}\` ka licence permanent cancel kar diya gaya hai.`, { parse_mode: 'Markdown' });
+    } else {
+        ctx.reply("⚠️ Yeh ID agents ki list mein nahi mili.");
+    }
+});
+
+// --- 🔬 CORE BREAKDOWN SCRAPER ENGINE ---
+async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
+    if (!activeUsers[chatId]) return;
+    const itemIndex = activeUsers[chatId].findIndex(item => item.id === pid);
+    if (itemIndex === -1) return;
+
+    try {
+        const response = await axios.get(originalUrl, {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
+            },
+            timeout: 12000 
+        });
+
+        const html = response.data;
+        
+        let currentPrice = "N/A";
+        const jsonLdMatch = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i);
+        if (jsonLdMatch && jsonLdMatch[1]) {
+            try {
+                const jsonData = JSON.parse(jsonLdMatch[1].trim());
+                const itemData = Array.isArray(jsonData) ? jsonData.find(i => i["@type"] === "Product" || i.offers) : jsonData;
+                if (itemData && itemData.offers) {
+                    let priceVal = Array.isArray(itemData.offers) ? itemData.offers[0].price : itemData.offers.price;
+                    if (priceVal) currentPrice = String(priceVal).replace(/[^0-9]/g, '');
+                }
+            } catch (e) {}
+        }
+        if (currentPrice === "N/A") {
+            let priceMatch = html.match(/"price"\s*:\s*"?([0-9]+)"?/i);
+            if (priceMatch) currentPrice = priceMatch[1];
+        }
+
+        let currentOffersRaw = [];
+        const offerRegex = /(?:bank offer|instant discount| cashback|off on credit card|off on debit card|emi)[^<"'\x7b\x7d\(\)]+/gi;
+        let match;
+        let combinedOffersText = "";
+        
+        while ((match = offerRegex.exec(html)) !== null && currentOffersRaw.length < 5) {
+            let cleanOffer = match[0].replace(/<\/?[^>]+(>|$)/g, "").trim();
+            cleanOffer = cleanOffer.replace(/[a-zA-Z0-9\-_.]+\.[a-zA-Z0-9]+.*/g, "").trim();
+            
+            if (cleanOffer.length > 12 && cleanOffer.length < 120 && !currentOffersRaw.includes(cleanOffer) && !cleanOffer.includes('font-family') && !cleanOffer.includes('emit')) {
+                currentOffersRaw.push(currentOffersRaw.length);
+                currentOffersRaw[currentOffersRaw.length - 1] = cleanOffer;
+                combinedOffersText += `🔹 ${cleanOffer}\n`;
+            }
+        }
+        if (!combinedOffersText) combinedOffersText = "No active bank offers detected on page.";
+
+        let instance = activeUsers[chatId][itemIndex];
+
+        if (instance.lastPrice === null && instance.lastOffers === null) {
+            instance.lastPrice = currentPrice;
+            instance.lastOffers = combinedOffersText;
+            instance.lastOffersRaw = currentOffersRaw;
+            return;
+        }
+
+        let isFluctuationDetected = false;
+        let changeLogs = [];
+
+        if (mode === 'both') {
+            if (currentPrice !== "N/A" && instance.lastPrice !== "N/A" && currentPrice !== instance.lastPrice) {
+                isFluctuationDetected = true;
+                changeLogs.push(`💰 <b>PRICE CHANGE DETECTED:</b>\n📉 Old Price: ₹${instance.lastPrice}\n📈 New Price: ₹${currentPrice}`);
+            }
+        }
+
+        if (combinedOffersText !== instance.lastOffers) {
+            isFluctuationDetected = true;
+            
+            let addedOffers = currentOffersRaw.filter(x => !instance.lastOffersRaw.includes(x));
+            let removedOffers = instance.lastOffersRaw.filter(x => !currentOffersRaw.includes(x));
+
+            let offerChangeMsg = `💳 <b>BANK OFFER TEXT/VALUE CHANGED:</b>\n`;
+            if (addedOffers.length > 0) {
+                offerChangeMsg += `✅ <b>Naya Offer Add Hua:</b>\n${addedOffers.map(o => `👉 ${o}`).join('\n')}\n`;
+            }
+            if (removedOffers.length > 0) {
+                offerChangeMsg += `❌ <b>Purana Offer Hat Gya:</b>\n${removedOffers.map(o => `👉 ${o}`).join('\n')}\n`;
+            }
+            if (addedOffers.length === 0 && removedOffers.length === 0) {
+                offerChangeMsg += `⚠️ <i>Offers ke numeric values/EMI conditions badle hain!</i>`;
+            }
+            changeLogs.push(offerChangeMsg);
+        }
+
+        if (isFluctuationDetected || instance.alertFired === true) {
+            if (isFluctuationDetected && !instance.savedChangeLogs) {
+                instance.savedChangeLogs = changeLogs.join('\n\n');
+                instance.lastPrice = currentPrice;
+                instance.lastOffers = combinedOffersText;
+                instance.lastOffersRaw = currentOffersRaw;
+            }
+            
+            instance.alertFired = true; 
+            let priceDisplay = currentPrice !== "N/A" ? `₹${currentPrice}` : "N/A";
+            let displayLogs = instance.savedChangeLogs || `⚠️ <i>System Alert:</i> Fluctuations observed!`;
+
+            await bot.telegram.sendMessage(chatId, 
+                `🔥 <b>Oo bhaiiii price ya offers badal gya hai jldi ja lgake lgane!</b> 🔥\n\n${displayLogs}\n\n📊 <b>Current Live Snapshot:</b>\n💰 Price: <b>${priceDisplay}</b>\n🏛️ Live Bank Terms:\n${combinedOffersText}\n\nLink:\n${originalUrl}`,
+                {
+                    parse_mode: 'HTML',
+                    ...Markup.inlineKeyboard([[Markup.button.callback('Stop Tracking 🛑', `stop_fk_${itemIndex}`)]])
+                }
+            ).catch(() => {});
+        }
+
+    } catch (err) {}
+}
+
+bot.launch().then(() => console.log("Spy Control Pro Stable Layout Live..."));
