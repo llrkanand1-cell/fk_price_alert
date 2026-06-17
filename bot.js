@@ -7,7 +7,7 @@ const path = require('path');
 // --- CONFIGURATION ---
 const BOT_TOKEN = '8980239383:AAFwZVEzP0lTYoIG3-HYig4xTz47L1n0lXY'; 
 const ADMIN_CHAT_ID = '7485181331'; 
-const CHECK_INTERVAL = 30000; // 30 second loop
+const CHECK_INTERVAL = 30000; // 30 second precision loop
 const RENDER_URL = 'https://fk-financial-tracker.onrender.com'; // Locked Live URL
 const DB_FILE = path.join(__dirname, 'database.json');
 // ---------------------
@@ -86,7 +86,7 @@ bot.on('callback_query', async (ctx) => {
         }
         await ctx.editMessageText(`${ctx.callbackQuery.message.text}\n\n✅ **Status: Approved Permanently!**`).catch(() => {});
         
-        // 🔥 FIXED: Request approve hone ke baad ab sirf clean commands aur unke aage unke functions likhe hain!
+        // 🔥 FIXED: Approve hone ke baad saari commands perfectly underscore (_) format me clickeable jayengi!
         await bot.telegram.sendMessage(targetUserId, "🎉 **Mubarak ho! Admin ne aapka access approve kar diya hai!**\n\n👉 **Bot Commands Matrix:**\n💰 /track_both — Price + Bank Offers Monitor\n💳 /track_bank — Only Bank Offers Alert\n📋 /list_track — Active tracking matrix\n🛑 /stop_all — Clear all tracking", { parse_mode: 'Markdown' }).catch(() => {});
     } else if (data.startsWith('decline_')) {
         await ctx.editMessageText(`${ctx.callbackQuery.message.text}\n\n❌ **Status: Declined!**`).catch(() => {});
@@ -100,7 +100,6 @@ bot.start((ctx) => {
     const name = `${ctx.from.first_name || ''}`.trim();
     
     if (isUserApproved(userId)) {
-        // 🔥 FIXED: /start command ke andar se bhi URL tags ko clean kar diya hai
         return ctx.reply(`🤖 *Welcome ${name}!* Fixed Financial Tracker Live!\n\n🔹 **Commands Matrix:**\n🚀 \`/track_both\` — Price + Bank Offers Monitor\n🛵 \`/track_bank\` — Only Bank Offers Alert\n📋 \`/list_track\` — Active tracking matrix\n🛑 \`/stop_all\` — Clear all tracking`, { parse_mode: 'Markdown' });
     }
     
@@ -121,7 +120,6 @@ function setupTrackingEngine(ctx, mode, modeLabel) {
     const args = ctx.message.text.replace(/\n/g, ' ').split(' ').filter(arg => arg.trim() !== '');
     
     let fkLink = args.find(arg => arg.includes('flipkart.com/'));
-    // 🔥 FIXED: Format error error instruction me se bhi tag saaf kar diya
     if (!fkLink) return ctx.reply(`❌ Format error! Command ke aage link space dekar bhejein. Example:\n\`/${ctx.command} https://flipkart.com/...\``, { parse_mode: 'Markdown' });
     
     let pid = "";
