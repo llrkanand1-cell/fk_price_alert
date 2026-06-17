@@ -1,6 +1,6 @@
 const { Telegraf, Markup } = require('telegraf');
 const axios = require('axios');
-const cheerio = require('cheerio'); // 🔥 Force Clean Parsing
+const cheerio = require('cheerio'); 
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
@@ -8,7 +8,7 @@ const path = require('path');
 // --- 🔒 CONFIGURATION HARDLOCKED ---
 const BOT_TOKEN = '8980239383:AAFwZVEzP0lTYoIG3-HYig4xTz47L1n0lXY'; 
 const ADMIN_CHAT_ID = '7485181331'; 
-const CHECK_INTERVAL = 15000; // STRICT 15 SECONDS PRECISION LOOP
+const CHECK_INTERVAL = 15000; 
 const RENDER_URL = 'https://fk-financial-tracker.onrender.com'; 
 const DB_FILE = path.join(__dirname, 'database.json');
 // ----------------------------------------
@@ -79,7 +79,7 @@ app.listen(PORT, '0.0.0.0', async () => {
         await bot.telegram.setWebhook(`${RENDER_URL}/secret-telegram-webhook`, {
             drop_pending_updates: true 
         });
-        console.log("🎯 Telegram Webhook and Approval Matrix binded successfully!");
+        console.log("🎯 Webhook system strictly configured.");
     } catch (err) {
         console.log("⚠️ Webhook setup warning: ", err.message);
     }
@@ -261,7 +261,7 @@ function setupCoreScraperSystem(ctx, fkLink, mode, modeLabel) {
         id: pid, url: fkLink, mode: modeLabel, interval: intervalId, lastPrice: null, lastOffers: null
     });
 
-    ctx.reply(`🕵️‍♂️ **Undercover Agent Active!**\n\nHar 15 second mein strict checking locked hai boss!`);
+    ctx.reply(`🕵️‍♂️ **Undercover Agent Active!**\n\nStrict Class Parsing Enabled!`);
     checkFinancialFluctuations(ctx, chatId, pid, fkLink, mode);
 }
 
@@ -286,7 +286,7 @@ function killAllOperations(ctx) {
     } else { ctx.reply("⚠️ Koyi active operation chal hi nahi rahi."); }
 }
 
-// --- 🔬 HIGH-PRECISION STRICT CLEAN PARSER ---
+// --- 🔬 HIGH-PRECISION CLASS SCANNER ENGINE ---
 async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
     if (!activeUsers[chatId]) return;
     const itemIndex = activeUsers[chatId].findIndex(item => item.id === pid);
@@ -303,10 +303,8 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
         
         const $ = cheerio.load(response.data);
         
-        // 🔥 STRIKE 1: Extract ONLY Actual Selling Price from Flipkart DOM Classes
+        // 1. STRICT SELLING PRICE SELECTOR
         let cleanPrice = "N/A";
-        
-        // Sabse pehle strict json-ld check karenge jahan exact sellingPrice hoti hai
         const jsonLdMatch = response.data.toString().match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i);
         if (jsonLdMatch && jsonLdMatch[1]) {
             try {
@@ -319,7 +317,6 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
             } catch(e){}
         }
 
-        // Fallback: Agar JSON se nahi mila, toh specific Selling Price display container elements se uthayenge
         if (cleanPrice === "N/A") {
             const priceSelectors = ['.Nx9w9m', '._16Jg3T', '._30jeq3', '._25b18c'];
             for (let sel of priceSelectors) {
@@ -331,41 +328,35 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
             }
         }
 
-        // 🔥 STRIKE 2: Extract ONLY Actual Bank Offer Lists Items (Bypassing page kachra)
+        // 2. 🔥 STRICT BANK OFFERS WRAPPER TARGETING (Bypasses general page text)
         let currentOffersRaw = [];
         
-        // Flipkart ke product page par bank offers hamesha 📋 list tags mein encapsulated hote hain
-        $('li').each((i, el) => {
-            let line = $(el).text().trim().replace(/\s+/g, " ");
-            let lineLower = line.toLowerCase();
+        // Target specifically the grid/containers that hold genuine Flipkart bank offer text badges
+        $('._2-uGZ4, .jn8m6F, ._396_3A, .X1_10r').each((i, el) => {
+            let text = $(el).text().trim().replace(/\s+/g, " ");
+            let textLower = text.toLowerCase();
             
-            // Strict keywords matching for direct bank benefits
-            if (lineLower.includes('bank offer') || 
-                lineLower.includes('instant discount') || 
-                lineLower.includes('cashback') || 
-                lineLower.includes('off on credit card') || 
-                lineLower.includes('off on debit card')) {
-                
-                if (line.length > 20 && line.length < 95 && !currentOffersRaw.includes(line)) {
-                    currentOffersRaw.push(line);
+            if (textLower.includes('bank offer') || textLower.includes('instant discount') || textLower.includes('cashback')) {
+                // Strip unnecessary html symbols if any
+                let cleanLine = text.replace(/<\/?[^>]+(>|$)/g, "").trim();
+                if (cleanLine.length > 15 && cleanLine.length < 120 && !currentOffersRaw.includes(cleanLine)) {
+                    currentOffersRaw.push(cleanLine);
                 }
             }
         });
         
-        currentOffersRaw.sort(); // Sorting stops fake alerts triggered by shuffling DOM order
+        currentOffersRaw.sort();
         let combinedOffersText = currentOffersRaw.map(o => `🔹 ${o}`).join('\n');
         if (!combinedOffersText) combinedOffersText = "No active bank offers detected.";
 
         let instance = activeUsers[chatId][itemIndex];
         
-        // Initial setup on very first hit
         if (instance.lastPrice === null) {
             instance.lastPrice = cleanPrice;
             instance.lastOffers = combinedOffersText;
             return;
         }
 
-        // 🔥 DOUBLE GATE CHECK: Trigger strictly on real financial changes
         let isPriceModified = (mode === 'both' && cleanPrice !== instance.lastPrice && cleanPrice !== "N/A");
         let isOfferModified = (combinedOffersText !== instance.lastOffers);
 
@@ -374,7 +365,7 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
             instance.lastOffers = combinedOffersText;
 
             await bot.telegram.sendMessage(chatId, 
-                `🔥 <b>Oo bhaiiii price ya offers badal gya hai jldi ja lgake lgane!</b> 🔥\n\n💰 Live Price: <b>₹${cleanPrice}</b>\n🏛️ Bank Offers:\n${combinedOffersText}\nLink:\n${originalUrl}\n\n🛑 Stop instant: /stop${itemIndex + 1}`,
+                `🔥 <b>Oo bhaiiii badal gya hai snapshot!</b> 🔥\n\n💰 Live Price: <b>₹${cleanPrice}</b>\n🏛️ Bank Offers:\n${combinedOffersText}\nLink:\n${originalUrl}\n\n🛑 Stop instant: /stop${itemIndex + 1}`,
                 { parse_mode: 'HTML' }
             ).catch(() => {});
         }
