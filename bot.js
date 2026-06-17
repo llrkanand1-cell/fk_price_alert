@@ -16,58 +16,43 @@ const bot = new Telegraf(BOT_TOKEN);
 const activeUsers = {};
 const userSessions = {}; // Handles user tracking state silently
 
-// HARD ENGINE CACHE: Prevents file lock crashes
-let approvedUsersCache = [];
+// Permanent Panel Buttons Layout
+const getProKeyboard = () => {
+    return Markup.keyboard([
+        ['🚀 Track Both', '🛵 Track Bank'],
+        ['📋 List Active', '🛑 Stop All Operations']
+    ]).resize();
+};
 
-// --- 📂 BULLET-PROOF DATABASE LOGIC ---
-function initDatabase() {
+// --- 📂 PERMANENT FILE DATABASE LOGIC ---
+function loadApprovedUsers() {
     try {
         if (!fs.existsSync(DB_FILE)) {
             const initialData = [ADMIN_CHAT_ID.toString()];
             fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2));
-            approvedUsersCache = initialData;
-            return;
+            return initialData;
         }
         const fileContent = fs.readFileSync(DB_FILE, 'utf8');
-        if (!fileContent.trim()) {
-            approvedUsersCache = [ADMIN_CHAT_ID.toString()];
-            return;
-        }
         const users = JSON.parse(fileContent);
-        if (!Array.isArray(users)) {
-            approvedUsersCache = [ADMIN_CHAT_ID.toString()];
-            return;
-        }
         if (!users.includes(ADMIN_CHAT_ID.toString())) {
             users.push(ADMIN_CHAT_ID.toString());
         }
-        approvedUsersCache = users.map(String);
+        return users.map(String);
     } catch (e) {
-        approvedUsersCache = [ADMIN_CHAT_ID.toString()];
+        return [ADMIN_CHAT_ID.toString()];
     }
 }
-
-// Initialize database cache instantly
-initDatabase();
 
 function saveApprovedUsers(usersList) {
     try {
         const uniqueUsers = [...new Set(usersList.map(String))];
-        // Ensure Admin is always there
-        if (!uniqueUsers.includes(ADMIN_CHAT_ID.toString())) {
-            uniqueUsers.push(ADMIN_CHAT_ID.toString());
-        }
-        approvedUsersCache = uniqueUsers; 
         fs.writeFileSync(DB_FILE, JSON.stringify(uniqueUsers, null, 2));
-        console.log("Database updated successfully: ", approvedUsersCache);
-    } catch (e) {
-        console.log("Database write error: ", e);
-    }
+    } catch (e) {}
 }
 
 function isUserApproved(userId) {
     if (!userId) return false;
-    return approvedUsersCache.includes(userId.toString());
+    return loadApprovedUsers().includes(userId.toString());
 }
 // --------------------------------------------
 
@@ -81,65 +66,32 @@ setInterval(() => {
     axios.get(RENDER_URL).catch(() => {}); 
 }, 30000); 
 
-// Permanent Panel Buttons Layout
-const getProKeyboard = () => {
-    return Markup.keyboard([
-        ['🚀 Track Both', '🛵 Track Bank'],
-        ['📋 List Active', '🛑 Stop All Operations']
-    ]).resize();
-};
-
 // --- CALLBACK BUTTONS HANDLER ---
 bot.on('callback_query', async (ctx) => {
     const data = ctx.callbackQuery.data;
     const chatId = ctx.chat.id.toString();
     const clickerId = ctx.from.id.toString();
     
-    // Dynamic stop system for specific links
     if (data.startsWith('stop_fk_')) {
         const index = parseInt(data.split('_')[2]);
         if (activeUsers[chatId] && activeUsers[chatId][index]) {
             const removedItem = activeUsers[chatId][index];
             clearInterval(removedItem.interval);
             activeUsers[chatId].splice(index, 1);
-            
-            await ctx.answerCbQuery(`Target [${index + 1}] Stopped! 🛑`).catch(() => {});
-            await ctx.editMessageText(`🛑 <b>Target [${index + 1}] permanent saaf kar diya gaya hai!</b> Undercover agent ko is link se wapas bula liya:<br><code>${removedItem.url}</code>`, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(() => {});
-            return;
+            await ctx.answerCbQuery("Tracking band kar di gayi hai! 🛑").catch(() => {});
+            return ctx.reply(`🛑 Ok boss, tracking band kar di is link ki:\n${removedItem.url}`, { disable_web_page_preview: true });
         }
-        return ctx.answerCbQuery("⚠️ Yeh target pehle se hi band ho chuka hai.").catch(() => {});
-    }
-
-    // 🔥 FIXED: Direct Override for User Deletion button
-    if (data.startsWith('remusr_')) {
-        if (clickerId !== ADMIN_CHAT_ID.toString()) return ctx.answerCbQuery("❌ Unauthorized!").catch(() => {});
-        const targetUserId = data.split('_')[1].trim();
-        
-        // Directly filter out the user from memory cache
-        const newList = approvedUsersCache.filter(id => id.toString() !== targetUserId.toString());
-        
-        // Save the freshly stripped down array list
-        saveApprovedUsers(newList);
-        
-        // Kill active tracking intervals if any
-        if (activeUsers[targetUserId]) {
-            activeUsers[targetUserId].forEach(item => clearInterval(item.interval));
-            delete activeUsers[targetUserId];
-        }
-        
-        await ctx.answerCbQuery("Agent Booted! ❌").catch(() => {});
-        await ctx.editMessageText(`❌ <b>Agent ${targetUserId} ka licence permanent cancel kar diya gaya hai!</b> Database clean up successful.`, { parse_mode: 'HTML' }).catch(() => {});
-        bot.telegram.sendMessage(targetUserId, "🔒 <b>Your session has been terminated by Admin. Access revoked!</b>").catch(() => {});
-        return;
+        return ctx.answerCbQuery("⚠️ Already stopped.").catch(() => {});
     }
 
     if (clickerId !== ADMIN_CHAT_ID.toString()) return ctx.answerCbQuery("❌ Unauthorized!").catch(() => {});
     const targetUserId = data.split('_')[1].trim();
+    let currentList = loadApprovedUsers();
     
     if (data.startsWith('approve_')) {
-        if (!approvedUsersCache.includes(targetUserId)) {
-            approvedUsersCache.push(targetUserId);
-            saveApprovedUsers(approvedUsersCache);
+        if (!currentList.includes(targetUserId)) {
+            currentList.push(targetUserId);
+            saveApprovedUsers(currentList);
         }
         await ctx.editMessageText(`${ctx.callbackQuery.message.text}\n\n✅ **Mission Status: Agent Activated Permanently!**`).catch(() => {});
         await bot.telegram.sendMessage(targetUserId, "🎉 **Mubarak ho! Admin ne aapka secret access approve kar diya hai! Neeche diye gaye control panel se operation chalu karo.**", getProKeyboard()).catch(() => {});
@@ -155,11 +107,11 @@ bot.start((ctx) => {
     const name = `${ctx.from.first_name || ''}`.trim();
     
     if (isUserApproved(userId)) {
-        delete userSessions[userId]; 
-        return ctx.reply(`🤖 *Welcome Agent ${name}!* Secret Control Panel Activated!\n\nNeeche diye gaye buttons par click karke direct use karo boss! 😎`, getProKeyboard());
+        delete userSessions[userId]; // Reset state
+        return ctx.reply(`🤖 *Welcome Agent ${name}!* Secret Control Panel Activated!\n\nNeeche diye gaye buttons par click karke direct use karo boss, ab kuch type karne ka jhanjhat nahi! 😎`, getProKeyboard());
     }
     
-    ctx.reply(`🔒 **Access Denied!** ID: \`${userId}\` \nAdmin ke paas request bhej di gayi hai.`);
+    ctx.reply(`🔒 **Radar Blocked! Access Denied.**\n\nBhai, tu abhi secret network se bahar hai. Teri Request ID: \`${userId}\` ko cipher karke Admin (Loot Master) ke Control Room mein bhej diya gaya hai. Jab tak woh wahan se green signal nahi dete, tab tak chupchaap wait kar! 🤫`, { parse_mode: 'Markdown' });
     
     bot.telegram.sendMessage(ADMIN_CHAT_ID, `🚨 **Khufiya Report: New Agent Request!**\n\nControl Room Check! Ek naya banda secret network par aane ke liye line par aaya hai.\n👤 Name: *${name}*\n🆔 ID: \`${userId}\``, {
         parse_mode: 'Markdown',
@@ -167,7 +119,6 @@ bot.start((ctx) => {
     }).catch(() => {});
 });
 
-// --- KEYBOARD BUTTON TRIGGERS ---
 bot.hears('🚀 Track Both', (ctx) => {
     const userId = ctx.from.id.toString();
     if (!isUserApproved(userId)) return;
@@ -191,6 +142,7 @@ bot.hears('📋 List Active', (ctx) => { displayActiveTracks(ctx); });
 bot.command('stop_all', (ctx) => { killAllOperations(ctx); });
 bot.hears('🛑 Stop All Operations', (ctx) => { killAllOperations(ctx); });
 
+
 // --- SMART INCOMING MESSAGE INTERCEPTOR ---
 bot.on('text', async (ctx) => {
     const userId = ctx.from.id.toString();
@@ -208,7 +160,7 @@ bot.on('text', async (ctx) => {
         let fkLink = args.find(arg => arg.includes('flipkart.com/'));
 
         if (!fkLink) {
-            return ctx.reply(`❌ **Abe saaf link bhejo Agent!**\nInput mein Flipkart ka link nahi mila. Dobara sahi se link bhejo!`, getProKeyboard());
+            return ctx.reply(`❌ **Abe saaf link bhejo Agent!**\nInput mein Flipkart ka link nahi mila. Dobara sahi se link bhejo ya pehle command select karo!`, getProKeyboard());
         }
 
         setupCoreScraperSystem(ctx, fkLink, mode, modeLabel);
@@ -220,6 +172,8 @@ bot.on('text', async (ctx) => {
     }
 });
 
+
+// Helper execution engine blocks
 function handleLegacyCommands(ctx, mode, modeLabel) {
     const args = ctx.message.text.replace(/\n/g, ' ').split(' ').filter(arg => arg.trim() !== '');
     let fkLink = args.find(arg => arg.includes('flipkart.com/'));
@@ -258,7 +212,7 @@ function setupCoreScraperSystem(ctx, fkLink, mode, modeLabel) {
         lastOffersRaw: []
     });
 
-    ctx.reply(`🕵️‍♂️ **Undercover Agent Active!**\n\nBhai, tu Flipkart waalon ke liye ek "secret spy" chhod raha hai. \n\n☕ Chal ab tu aaram se jaake **chai-wai piyo ya mast neend poori karo**, unki lanka lagane ka kaam tere bhai par locked hai! 💣🚀`);
+    ctx.reply(`🕵️‍♂️ **Undercover Agent Active!**\n\nBhai, tu Flipkart waalon ke liye ek "secret spy" chhod raha hai. Woh log raat ko 2 baje bhi price badlenge ya bank discount ₹1500 se ₹2000 karenge na, toh tera bhai unki deewar kood kar tujhe khabar dega. \n\n☕ Chal ab tu aaram se jaake **chai-wai piyo ya mast neend poori karo**, unki lanka lagane ka kaam tere bhai par locked hai! 💣🚀`);
 
     checkFinancialFluctuations(ctx, chatId, pid, fkLink, mode);
 }
@@ -267,38 +221,13 @@ function displayActiveTracks(ctx) {
     const userId = ctx.from.id.toString();
     if (!isUserApproved(userId)) return;
     const chatId = ctx.chat.id.toString();
+    if (!activeUsers[chatId] || activeUsers[chatId].length === 0) return ctx.reply("😴 Abhi koi target radar par nahi hai, sab shant hai.");
     
-    if (!activeUsers[chatId] || activeUsers[chatId].length === 0) {
-        return ctx.reply("😴 Abhi koi target radar par nahi hai, sab shant hai.");
-    }
-    
-    let msg = "📋 <b>Radar Par Locked Targets Matrix:</b>\n\n";
-    let keyboardButtons = [];
-    let currentRow = [];
-
-    for (let index = 0; index < activeUsers[chatId].length; index++) {
-        const item = activeUsers[chatId][index];
-        msg += `🔢 <b>Target [${index + 1}]</b>\n📦 <b>ID:</b> <code>${item.id}</code>\n⚙️ <b>Mode:</b> <code>[${item.mode}]</code>\n🔗 <b>Link:</b> ${item.url}\n\n`;
-        
-        currentRow.push(Markup.button.callback(`Stop ${index + 1} 🛑`, `stop_fk_${index}`));
-        
-        if (currentRow.length === 2) {
-            keyboardButtons.push(currentRow);
-            currentRow = [];
-        }
-    }
-    
-    if (currentRow.length > 0) {
-        keyboardButtons.push(currentRow);
-    }
-
-    ctx.reply(msg, { 
-        parse_mode: 'HTML', 
-        disable_web_page_preview: true,
-        ...Markup.inlineKeyboard(keyboardButtons)
-    }).catch((err) => {
-        ctx.reply("⚠️ Structural layout re-syncing. Please try again.");
+    let msg = "📋 **Radar Par Locked Targets Matrix:**\n\n";
+    activeUsers[chatId].forEach((item, index) => {
+        msg += `${index + 1}. 📦 **ID:** \`${item.id}\` \n⚙️ **Mode:** \`[${item.mode}]\` \n🔗 **Link:** ${item.url}\n\n`;
     });
+    ctx.reply(msg, { parse_mode: 'Markdown', disable_web_page_preview: true });
 }
 
 function killAllOperations(ctx) {
@@ -312,83 +241,70 @@ function killAllOperations(ctx) {
     } else { ctx.reply("⚠️ Koyi active operation chal hi nahi rahi."); }
 }
 
+// Admin commands with denied alerts
 bot.command('approve', (ctx) => {
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
-        return ctx.reply("❌ **Access Denied!** Yeh command sirf asli Admin hi chala sakta hai. 😎");
+        return ctx.reply("❌ **Warning! Identity Verification Failed.**\nAbe shaane, yeh command sirf asli Loot Master (Admin) ke fingerprint par khulti hai. Chal peeche hatt! 👮‍♂️🔥");
     }
     const args = ctx.message.text.split(' ').filter(arg => arg.trim() !== '');
     if (args.length < 2) return ctx.reply("⚠️ Format: `/approve <user_id>`");
     const targetUserId = args[1].trim();
-    
-    if (!approvedUsersCache.includes(targetUserId)) {
-        approvedUsersCache.push(targetUserId);
-        saveApprovedUsers(approvedUsersCache);
-        ctx.reply(`✅ Agent \`${targetUserId}\` ko permanent access de diya gaya hai!`, { parse_mode: 'Markdown' });
+    let currentList = loadApprovedUsers();
+    if (!currentList.includes(targetUserId)) {
+        currentList.push(targetUserId);
+        saveApprovedUsers(currentList);
+        ctx.reply(`✅ Agent \`${targetUserId}\` ko permanent mission access de diya gaya hai!`, { parse_mode: 'Markdown' });
     } else {
         ctx.reply("⚠️ Yeh ID pehle se hi approved list mein hai.");
     }
 });
 
-// 🔥 DYNAMIC BUTTON INTERACTIVE USER MANAGEMENT SYSTEM
-bot.command('manage_users', (ctx) => {
-    if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
-        return ctx.reply("❌ **Access Denied!** Yeh command sirf asli Admin hi chala sakta hai. 😎");
-    }
-    
-    const rawUsers = approvedUsersCache.filter(id => id.toString() !== ADMIN_CHAT_ID.toString());
-    
-    if (rawUsers.length === 0) {
-        return ctx.reply("📋 **Database Room Status:** Abhi admin ke alawa koi dusra approved agent network par nahi hai.");
-    }
-    
-    let msg = "🛠️ **Loot Room Management Console:**\nNeeche approved users ki list hai, click karke permanent remove karo:\n\n";
-    let keyboardButtons = [];
-    
-    rawUsers.forEach((u, i) => {
-        msg += `${i + 1}. 🆔 User ID: <code>${u}</code>\n`;
-        keyboardButtons.push([Markup.button.callback(`Remove User ${u} ❌`, `remusr_${u}`)]);
-    });
-    
-    ctx.reply(msg, {
-        parse_mode: 'HTML',
-        ...Markup.inlineKeyboard(keyboardButtons)
-    });
-});
-
 bot.command('list_users', (ctx) => {
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
-        return ctx.reply("❌ **Access Denied!** Yeh command sirf asli Admin hi chala sakta hai. 😎");
+        return ctx.reply("❌ **Warning! Identity Verification Failed.**\nAbe shaane, yeh command sirf asli Loot Master (Admin) ke fingerprint par khulti hai. Chal peeche hatt! 👮‍♂️🔥");
     }
+    const currentList = loadApprovedUsers();
     let msg = "📋 **Approved Secret Agents Database List:**\n\n";
-    approvedUsersCache.forEach(u => msg += `- \`${u}\`\n`);
+    currentList.forEach(u => msg += `- \`${u}\`\n`);
     ctx.reply(msg, { parse_mode: 'Markdown' });
 });
 
-// Text command directly linked with core fixed array router
-bot.command('remove_user', (ctx) => {
+// --- 🔥 UPDATED: REMOVE USER WITH NOTIFICATION & WORKER CLEANUP 🔥 ---
+bot.command('remove_user', async (ctx) => {
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
-        return ctx.reply("❌ **Access Denied!**");
+        return ctx.reply("❌ **Warning! Identity Verification Failed.**\nAbe shaane, yeh command sirf asli Loot Master (Admin) ke fingerprint par khulti hai. Chal peeche hatt! 👮‍♂️🔥");
     }
-    const parts = ctx.message.text.trim().split(' ');
-    if (parts.length < 2) return ctx.reply("⚠️ Use: `/remove_user <user_id>`");
-    const targetUserId = parts[1].trim();
-
-    if (targetUserId === ADMIN_CHAT_ID.toString()) {
-        return ctx.reply("⚠️ Admin ko remove nahi kiya ja sakta.");
-    }
-
-    const idx = approvedUsersCache.indexOf(targetUserId);
+    const args = ctx.message.text.split(' ').filter(arg => arg.trim() !== '');
+    if (args.length < 2) return ctx.reply("⚠️ Format: `/remove_user <user_id>`");
+    
+    const targetUserId = args[1].trim();
+    let currentList = loadApprovedUsers();
+    const idx = currentList.indexOf(targetUserId);
+    
     if (idx !== -1) {
-        const newList = approvedUsersCache.filter(id => id.toString() !== targetUserId.toString());
-        saveApprovedUsers(newList);
-        if (activeUsers[targetUserId]) {
+        // 1. Database se remove karo
+        currentList.splice(idx, 1);
+        saveApprovedUsers(currentList);
+        
+        // 2. Us user ke background me chal rahe saare tracker intervals clear karo
+        if (activeUsers[targetUserId] && activeUsers[targetUserId].length > 0) {
             activeUsers[targetUserId].forEach(item => clearInterval(item.interval));
             delete activeUsers[targetUserId];
         }
-        ctx.reply(`❌ Agent \`${targetUserId}\` permanent saaf!`);
-        bot.telegram.sendMessage(targetUserId, "🔒 <b>Your session has been terminated by Admin. Access revoked!</b>").catch(() => {});
+        if (userSessions[targetUserId]) delete userSessions[targetUserId];
+
+        // 3. Admin ko reply bhejo
+        ctx.reply(`❌ Agent \`${targetUserId}\` ka licence permanent cancel kar diya gaya hai aur uski tracking matrix destroy kar di gayi hai.`, { parse_mode: 'Markdown' });
+        
+        // 4. 🔥 Target User ko warning message bhejo aur unka keyboard normal remove karo
+        bot.telegram.sendMessage(
+            targetUserId, 
+            "⚠️ **bhai admin ne tera access hata diya hai** 🚫\n\nAb aap is bot ke khufiya feature use nahi kar sakte.",
+            Markup.removeKeyboard() // Control panel buttons gayab karne ke liye
+        ).catch(() => {});
+        
     } else {
-        ctx.reply("⚠️ User list mein nahi mila. Dynamic Panel use karein: `/manage_users`");
+        ctx.reply("⚠️ Yeh ID agents ki list mein nahi mili.");
     }
 });
 
@@ -458,7 +374,7 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
         if (mode === 'both') {
             if (currentPrice !== "N/A" && instance.lastPrice !== "N/A" && currentPrice !== instance.lastPrice) {
                 isFluctuationDetected = true;
-                changeLogs.push(`💰 <b>PRICE CHANGE DETECTED:</b>\n📉 Old Price: ₹${instance.lastPrice}\n📈 New Price: ₹${currentPrice}`);
+                changeLogs.push(`💰 **PRICE CHANGE DETECTED:**\n📉 Old Price: ₹${instance.lastPrice}\n📈 New Price: ₹${currentPrice}`);
             }
         }
 
@@ -468,15 +384,15 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
             let addedOffers = currentOffersRaw.filter(x => !instance.lastOffersRaw.includes(x));
             let removedOffers = instance.lastOffersRaw.filter(x => !currentOffersRaw.includes(x));
 
-            let offerChangeMsg = `💳 <b>BANK OFFER TEXT/VALUE CHANGED:</b>\n`;
+            let offerChangeMsg = `💳 **BANK OFFER TEXT/VALUE CHANGED:**\n`;
             if (addedOffers.length > 0) {
-                offerChangeMsg += `✅ <b>Naya Offer Add Hua:</b>\n${addedOffers.map(o => `👉 ${o}`).join('\n')}\n`;
+                offerChangeMsg += `✅ **Naya Offer Add Hua:**\n${addedOffers.map(o => `👉 ${o}`).join('\n')}\n`;
             }
             if (removedOffers.length > 0) {
-                offerChangeMsg += `❌ <b>Purana Offer Hat Gya:</b>\n${removedOffers.map(o => `👉 ${o}`).join('\n')}\n`;
+                offerChangeMsg += `❌ **Purana Offer Hat Gya:**\n${removedOffers.map(o => `👉 ${o}`).join('\n')}\n`;
             }
             if (addedOffers.length === 0 && removedOffers.length === 0) {
-                offerChangeMsg += `⚠️ <i>Offers ke numeric values/EMI conditions badle hain!</i>`;
+                offerChangeMsg += `⚠️ *Offers ke numeric values/EMI conditions badle hain!*`;
             }
             changeLogs.push(offerChangeMsg);
         }
@@ -491,12 +407,12 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
             
             instance.alertFired = true; 
             let priceDisplay = currentPrice !== "N/A" ? `₹${currentPrice}` : "N/A";
-            let displayLogs = instance.savedChangeLogs || `⚠️ <i>System Alert:</i> Fluctuations observed!`;
+            let displayLogs = instance.savedChangeLogs || `⚠️ *System Alert:* Fluctuations observed!`;
 
             await bot.telegram.sendMessage(chatId, 
-                `🔥 <b>Oo bhaiiii price ya offers badal gya hai jldi ja lgake lgane!</b> 🔥\n\n${displayLogs}\n\n📊 <b>Current Live Snapshot:</b>\n💰 Price: <b>${priceDisplay}</b>\n🏛️ Live Bank Terms:\n${combinedOffersText}\n\nLink:\n${originalUrl}`,
+                `🔥 **Oo bhaiiii price ya offers badal gya hai jldi ja lgake lgane!** 🔥\n\n${displayLogs}\n\n📊 **Current Live Snapshot:**\n💰 Price: *${priceDisplay}*\n🏛️ Live Bank Terms:\n${combinedOffersText}\n\nLink:\n${originalUrl}`,
                 {
-                    parse_mode: 'HTML',
+                    parse_mode: 'Markdown',
                     ...Markup.inlineKeyboard([[Markup.button.callback('Stop Tracking 🛑', `stop_fk_${itemIndex}`)]])
                 }
             ).catch(() => {});
@@ -505,7 +421,4 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
     } catch (err) {}
 }
 
-// FORCE FLUSH TO CLEAR DEPLOY CONFLICTS
-bot.telegram.deleteWebhook().then(() => {
-    bot.launch().then(() => console.log("Spy Control Pro Stable Layout Live..."));
-});
+bot.launch().then(() => console.log("Spy Control Pro Clean Setup Live..."));
