@@ -81,7 +81,6 @@ bot.on('callback_query', async (ctx) => {
     const chatId = ctx.chat.id.toString();
     const clickerId = ctx.from.id.toString();
     
-    // HANDLING DYNAMIC TARGET RECOVERY FROM ACTIVE LIST (Stop 1st, 2nd, 3rd)
     if (data.startsWith('stop_fk_')) {
         const index = parseInt(data.split('_')[2]);
         if (activeUsers[chatId] && activeUsers[chatId][index]) {
@@ -230,6 +229,7 @@ function setupCoreScraperSystem(ctx, fkLink, mode, modeLabel) {
     checkFinancialFluctuations(ctx, chatId, pid, fkLink, mode);
 }
 
+// 🔥 FIXED: Ekdum saaf format parser taaki list console par crash na ho
 function displayActiveTracks(ctx) {
     const userId = ctx.from.id.toString();
     if (!isUserApproved(userId)) return;
@@ -244,7 +244,7 @@ function displayActiveTracks(ctx) {
     let currentRow = [];
 
     activeUsers[chatId].forEach((item, index) => {
-        msg += `🔢 **Target [${index + 1}]**\n📦 **ID:** \`${item.id}\` \n⚙️ **Mode:** \`[${item.mode}]\` \n🔗 **Link:** ${item.url}\n\n`;
+        msg += `🔢 *Target [${index + 1}]*\n📦 *ID:* \`${item.id}\` \n⚙️ *Mode:* \`[${item.mode}]\` \n🔗 *Link:* ${item.url}\n\n`;
         
         currentRow.push(Markup.button.callback(`Stop ${index + 1} 🛑`, `stop_fk_${index}`));
         
