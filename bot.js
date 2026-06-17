@@ -24,7 +24,7 @@ const getProKeyboard = () => {
     ]).resize();
 };
 
-// --- 📂 PERMANENT FILE DATABASE LOGIC ---
+// --- 📂 HARD-LOCKED FILE DATABASE LOGIC ---
 function loadApprovedUsers() {
     try {
         if (!fs.existsSync(DB_FILE)) {
@@ -33,7 +33,13 @@ function loadApprovedUsers() {
             return initialData;
         }
         const fileContent = fs.readFileSync(DB_FILE, 'utf8');
+        if (!fileContent.trim()) {
+            return [ADMIN_CHAT_ID.toString()];
+        }
         const users = JSON.parse(fileContent);
+        if (!Array.isArray(users)) {
+            return [ADMIN_CHAT_ID.toString()];
+        }
         if (!users.includes(ADMIN_CHAT_ID.toString())) {
             users.push(ADMIN_CHAT_ID.toString());
         }
@@ -46,6 +52,9 @@ function loadApprovedUsers() {
 function saveApprovedUsers(usersList) {
     try {
         const uniqueUsers = [...new Set(usersList.map(String))];
+        if (!uniqueUsers.includes(ADMIN_CHAT_ID.toString())) {
+            uniqueUsers.push(ADMIN_CHAT_ID.toString());
+        }
         fs.writeFileSync(DB_FILE, JSON.stringify(uniqueUsers, null, 2));
     } catch (e) {}
 }
@@ -267,7 +276,7 @@ function killAllOperations(ctx) {
     } else { ctx.reply("⚠️ Koyi active operation chal hi nahi rahi."); }
 }
 
-// --- 🔥 ADMIN CONTROL ROOM COMMANDS 🔥 ---
+// --- ADMIN CONTROL ROOM COMMANDS ---
 bot.command('approve', (ctx) => {
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
         return ctx.reply("❌ **Warning! Identity Verification Failed.**\nAbe shaane, yeh command sirf asli Loot Master (Admin) ke fingerprint par khulti hai. Chal peeche hatt! 👮‍♂️🔥");
@@ -295,7 +304,6 @@ bot.command('list_users', (ctx) => {
     ctx.reply(msg, { parse_mode: 'Markdown' });
 });
 
-// 🔥 REMOVE USER ABILITY: Admin can ban any user anytime completely
 bot.command('remove_user', (ctx) => {
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
         return ctx.reply("❌ **Warning! Identity Verification Failed.**\nAbe shaane, yeh command sirf asli Loot Master (Admin) ke fingerprint par khulti hai. Chal peeche hatt! 👮‍♂️🔥");
@@ -314,15 +322,12 @@ bot.command('remove_user', (ctx) => {
         currentList.splice(idx, 1);
         saveApprovedUsers(currentList);
         
-        // Target user ka internal loop context state clean-up agar chal rha ho toh
         if (activeUsers[targetUserId]) {
             activeUsers[targetUserId].forEach(item => clearInterval(item.interval));
             delete activeUsers[targetUserId];
         }
         
         ctx.reply(`❌ Agent \`${targetUserId}\` ka licence permanent cancel kar diya gaya hai aur data wipe kar diya hai!`, { parse_mode: 'Markdown' });
-        
-        // Infom target user silently about de-authorization block
         bot.telegram.sendMessage(targetUserId, "🔒 **Your session has been terminated by Admin.** Access revoked!").catch(() => {});
     } else {
         ctx.reply("⚠️ Yeh ID agents ki approved database list mein nahi mili.");
@@ -442,4 +447,4 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
     } catch (err) {}
 }
 
-bot.launch().then(() => console.log("Spy Control Room System Fired Up..."));
+bot.launch().then(() => console.log("Spy Control Room System Hardlocked Permanently..."));
