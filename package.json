@@ -1,0 +1,14 @@
+{
+  "name": "fk-financial-master-bot",
+  "version": "1.0.0",
+  "description": "Flipkart Financial Fluctuations Master Tracker",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.8",
+    "express": "^4.19.2",
+    "telegraf": "^4.16.3"
+  }
+}
