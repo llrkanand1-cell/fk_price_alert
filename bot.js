@@ -100,11 +100,35 @@ bot.on('callback_query', async (ctx) => {
             activeUsers[chatId].splice(index, 1);
             
             await ctx.answerCbQuery(`Target [${index + 1}] Stopped! 🛑`).catch(() => {});
-            
             await ctx.editMessageText(`🛑 <b>Target [${index + 1}] permanent saaf kar diya gaya hai!</b> Undercover agent ko is link se wapas bula liya:<br><code>${removedItem.url}</code>`, { parse_mode: 'HTML', disable_web_page_preview: true }).catch(() => {});
             return;
         }
         return ctx.answerCbQuery("⚠️ Yeh target pehle se hi band ho chuka hai.").catch(() => {});
+    }
+
+    // 🔥 NEW: Inline Button Click Handler for Removing Users
+    if (data.startsWith('remusr_')) {
+        if (clickerId !== ADMIN_CHAT_ID.toString()) return ctx.answerCbQuery("❌ Unauthorized!").catch(() => {});
+        const targetUserId = data.split('_')[1].trim();
+        
+        let currentList = [...approvedUsersCache];
+        const idx = currentList.indexOf(targetUserId);
+        if (idx !== -1) {
+            currentList.splice(idx, 1);
+            saveApprovedUsers(currentList);
+            
+            if (activeUsers[targetUserId]) {
+                activeUsers[targetUserId].forEach(item => clearInterval(item.interval));
+                delete activeUsers[targetUserId];
+            }
+            
+            await ctx.answerCbQuery("Agent Removed Successfully! ❌").catch(() => {});
+            await ctx.editMessageText(`❌ <b>Agent ${targetUserId} ka access permanent block kar diya gaya hai!</b> Data wiped successfully.`, { parse_mode: 'HTML' }).catch(() => {});
+            bot.telegram.sendMessage(targetUserId, "🔒 <b>Your session has been terminated by Admin. Access revoked!</b>").catch(() => {});
+        } else {
+            await ctx.answerCbQuery("⚠️ Already removed or not found.").catch(() => {});
+        }
+        return;
     }
 
     if (clickerId !== ADMIN_CHAT_ID.toString()) return ctx.answerCbQuery("❌ Unauthorized!").catch(() => {});
@@ -286,10 +310,10 @@ function killAllOperations(ctx) {
     } else { ctx.reply("⚠️ Koyi active operation chal hi nahi rahi."); }
 }
 
-// --- 🔥 HARDLOCKED ADMIN VALIDATION SYSTEM 🔥 ---
+// --- 🔥 UPGRADED ADMIN CONTROL PANEL ENGINE 🔥 ---
 bot.command('approve', (ctx) => {
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
-        return ctx.reply("❌ **Access Denied!** Yeh command sirf asli Admin (Loot Master) hi chala sakta hai. 😎");
+        return ctx.reply("❌ **Access Denied!** Yeh command sirf asli Admin hi chala sakta hai. 😎");
     }
     const args = ctx.message.text.split(' ').filter(arg => arg.trim() !== '');
     if (args.length < 2) return ctx.reply("⚠️ Format: `/approve <user_id>`");
@@ -304,43 +328,63 @@ bot.command('approve', (ctx) => {
     }
 });
 
+// 🔥 NEW DIRECT BUTTON INTERACTIVE USER MANAGEMENT SYSTEM
+bot.command('manage_users', (ctx) => {
+    if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
+        return ctx.reply("❌ **Access Denied!** Yeh command sirf asli Admin hi chala sakta hai. 😎");
+    }
+    
+    // Filter out Admin itself from management list look
+    const rawUsers = approvedUsersCache.filter(id => id !== ADMIN_CHAT_ID.toString());
+    
+    if (rawUsers.length === 0) {
+        return ctx.reply("📋 **Database Room Status:** Abhi admin ke alawa koi dusra approved agent network par nahi hai.");
+    }
+    
+    let msg = "🛠️ **Loot Room Management Console:**\nNeeche approved users ki list hai, click karke permanent remove karo:\n\n";
+    let keyboardButtons = [];
+    
+    rawUsers.forEach((u, i) => {
+        msg += `${i + 1}. 🆔 User ID: <code>${u}</code>\n`;
+        keyboardButtons.push([Markup.button.callback(`Remove User ${u} ❌`, `remusr_${u}`)]);
+    });
+    
+    ctx.reply(msg, {
+        parse_mode: 'HTML',
+        ...Markup.inlineKeyboard(keyboardButtons)
+    });
+});
+
 bot.command('list_users', (ctx) => {
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
-        return ctx.reply("❌ **Access Denied!** Yeh command sirf asli Admin (Loot Master) hi chala sakta hai. 😎");
+        return ctx.reply("❌ **Access Denied!** Yeh command sirf asli Admin hi chala sakta hai. 😎");
     }
     let msg = "📋 **Approved Secret Agents Database List:**\n\n";
     approvedUsersCache.forEach(u => msg += `- \`${u}\`\n`);
     ctx.reply(msg, { parse_mode: 'Markdown' });
 });
 
+// Keep standard text backup command as safety filter
 bot.command('remove_user', (ctx) => {
-    // 🔥 DOUBLE PROOF BLOCK FOR NON-ADMINS
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
-        return ctx.reply("❌ **Access Denied!** Yeh command sirf asli Admin (Loot Master) hi chala sakta hai. 😎");
+        return ctx.reply("❌ **Access Denied!**");
     }
-    const args = ctx.message.text.split(' ').filter(arg => arg.trim() !== '');
-    if (args.length < 2) return ctx.reply("⚠️ Format: `/remove_user <user_id>`");
-    const targetUserId = args[1].trim();
-    
-    if (targetUserId === ADMIN_CHAT_ID.toString()) {
-        return ctx.reply("⚠️ Abe khud ko hi thodi na remove kar doge master! 🤣");
-    }
+    const parts = ctx.message.text.trim().split(' ');
+    if (parts.length < 2) return ctx.reply("⚠️ Use: `/remove_user <user_id>`");
+    const targetUserId = parts[1].trim();
 
     let currentList = [...approvedUsersCache];
     const idx = currentList.indexOf(targetUserId);
     if (idx !== -1) {
         currentList.splice(idx, 1);
         saveApprovedUsers(currentList);
-        
         if (activeUsers[targetUserId]) {
             activeUsers[targetUserId].forEach(item => clearInterval(item.interval));
             delete activeUsers[targetUserId];
         }
-        
-        ctx.reply(`❌ Agent \`${targetUserId}\` ka licence permanent cancel kar diya gaya hai aur system se data wipe kar diya hai!`, { parse_mode: 'Markdown' });
-        bot.telegram.sendMessage(targetUserId, "🔒 **Your session has been terminated by Admin.** Access revoked!").catch(() => {});
+        ctx.reply(`❌ Agent \`${targetUserId}\` permanent saaf!`);
     } else {
-        ctx.reply("⚠️ Yeh ID agents ki approved list mein nahi mili.");
+        ctx.reply("⚠️ User not found. Dynamic Panel use karein: `/manage_users`");
     }
 });
 
@@ -420,7 +464,7 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
             let addedOffers = currentOffersRaw.filter(x => !instance.lastOffersRaw.includes(x));
             let removedOffers = instance.lastOffersRaw.filter(x => !currentOffersRaw.includes(x));
 
-            let offerChangeMsg = `💳 <b>BANK OFFER TEXT/VALUE CHANGED:</b>\n`;
+            let offerChangeMsg = `CNB <b>BANK OFFER TEXT/VALUE CHANGED:</b>\n`;
             if (addedOffers.length > 0) {
                 offerChangeMsg += `✅ <b>Naya Offer Add Hua:</b>\n${addedOffers.map(o => `👉 ${o}`).join('\n')}\n`;
             }
