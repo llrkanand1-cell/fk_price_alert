@@ -53,12 +53,16 @@ initDatabase();
 function saveApprovedUsers(usersList) {
     try {
         const uniqueUsers = [...new Set(usersList.map(String))];
+        // Ensure Admin is always there
         if (!uniqueUsers.includes(ADMIN_CHAT_ID.toString())) {
             uniqueUsers.push(ADMIN_CHAT_ID.toString());
         }
         approvedUsersCache = uniqueUsers; 
         fs.writeFileSync(DB_FILE, JSON.stringify(uniqueUsers, null, 2));
-    } catch (e) {}
+        console.log("Database updated successfully: ", approvedUsersCache);
+    } catch (e) {
+        console.log("Database write error: ", e);
+    }
 }
 
 function isUserApproved(userId) {
@@ -106,28 +110,26 @@ bot.on('callback_query', async (ctx) => {
         return ctx.answerCbQuery("⚠️ Yeh target pehle se hi band ho chuka hai.").catch(() => {});
     }
 
-    // 🔥 NEW: Inline Button Click Handler for Removing Users
+    // 🔥 FIXED: Direct Override for User Deletion button
     if (data.startsWith('remusr_')) {
         if (clickerId !== ADMIN_CHAT_ID.toString()) return ctx.answerCbQuery("❌ Unauthorized!").catch(() => {});
         const targetUserId = data.split('_')[1].trim();
         
-        let currentList = [...approvedUsersCache];
-        const idx = currentList.indexOf(targetUserId);
-        if (idx !== -1) {
-            currentList.splice(idx, 1);
-            saveApprovedUsers(currentList);
-            
-            if (activeUsers[targetUserId]) {
-                activeUsers[targetUserId].forEach(item => clearInterval(item.interval));
-                delete activeUsers[targetUserId];
-            }
-            
-            await ctx.answerCbQuery("Agent Removed Successfully! ❌").catch(() => {});
-            await ctx.editMessageText(`❌ <b>Agent ${targetUserId} ka access permanent block kar diya gaya hai!</b> Data wiped successfully.`, { parse_mode: 'HTML' }).catch(() => {});
-            bot.telegram.sendMessage(targetUserId, "🔒 <b>Your session has been terminated by Admin. Access revoked!</b>").catch(() => {});
-        } else {
-            await ctx.answerCbQuery("⚠️ Already removed or not found.").catch(() => {});
+        // Directly filter out the user from memory cache
+        const newList = approvedUsersCache.filter(id => id.toString() !== targetUserId.toString());
+        
+        // Save the freshly stripped down array list
+        saveApprovedUsers(newList);
+        
+        // Kill active tracking intervals if any
+        if (activeUsers[targetUserId]) {
+            activeUsers[targetUserId].forEach(item => clearInterval(item.interval));
+            delete activeUsers[targetUserId];
         }
+        
+        await ctx.answerCbQuery("Agent Booted! ❌").catch(() => {});
+        await ctx.editMessageText(`❌ <b>Agent ${targetUserId} ka licence permanent cancel kar diya gaya hai!</b> Database clean up successful.`, { parse_mode: 'HTML' }).catch(() => {});
+        bot.telegram.sendMessage(targetUserId, "🔒 <b>Your session has been terminated by Admin. Access revoked!</b>").catch(() => {});
         return;
     }
 
@@ -310,7 +312,6 @@ function killAllOperations(ctx) {
     } else { ctx.reply("⚠️ Koyi active operation chal hi nahi rahi."); }
 }
 
-// --- 🔥 UPGRADED ADMIN CONTROL PANEL ENGINE 🔥 ---
 bot.command('approve', (ctx) => {
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
         return ctx.reply("❌ **Access Denied!** Yeh command sirf asli Admin hi chala sakta hai. 😎");
@@ -328,14 +329,13 @@ bot.command('approve', (ctx) => {
     }
 });
 
-// 🔥 NEW DIRECT BUTTON INTERACTIVE USER MANAGEMENT SYSTEM
+// 🔥 DYNAMIC BUTTON INTERACTIVE USER MANAGEMENT SYSTEM
 bot.command('manage_users', (ctx) => {
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
         return ctx.reply("❌ **Access Denied!** Yeh command sirf asli Admin hi chala sakta hai. 😎");
     }
     
-    // Filter out Admin itself from management list look
-    const rawUsers = approvedUsersCache.filter(id => id !== ADMIN_CHAT_ID.toString());
+    const rawUsers = approvedUsersCache.filter(id => id.toString() !== ADMIN_CHAT_ID.toString());
     
     if (rawUsers.length === 0) {
         return ctx.reply("📋 **Database Room Status:** Abhi admin ke alawa koi dusra approved agent network par nahi hai.");
@@ -364,7 +364,7 @@ bot.command('list_users', (ctx) => {
     ctx.reply(msg, { parse_mode: 'Markdown' });
 });
 
-// Keep standard text backup command as safety filter
+// Text command directly linked with core fixed array router
 bot.command('remove_user', (ctx) => {
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
         return ctx.reply("❌ **Access Denied!**");
@@ -373,18 +373,22 @@ bot.command('remove_user', (ctx) => {
     if (parts.length < 2) return ctx.reply("⚠️ Use: `/remove_user <user_id>`");
     const targetUserId = parts[1].trim();
 
-    let currentList = [...approvedUsersCache];
-    const idx = currentList.indexOf(targetUserId);
+    if (targetUserId === ADMIN_CHAT_ID.toString()) {
+        return ctx.reply("⚠️ Admin ko remove nahi kiya ja sakta.");
+    }
+
+    const idx = approvedUsersCache.indexOf(targetUserId);
     if (idx !== -1) {
-        currentList.splice(idx, 1);
-        saveApprovedUsers(currentList);
+        const newList = approvedUsersCache.filter(id => id.toString() !== targetUserId.toString());
+        saveApprovedUsers(newList);
         if (activeUsers[targetUserId]) {
             activeUsers[targetUserId].forEach(item => clearInterval(item.interval));
             delete activeUsers[targetUserId];
         }
         ctx.reply(`❌ Agent \`${targetUserId}\` permanent saaf!`);
+        bot.telegram.sendMessage(targetUserId, "🔒 <b>Your session has been terminated by Admin. Access revoked!</b>").catch(() => {});
     } else {
-        ctx.reply("⚠️ User not found. Dynamic Panel use karein: `/manage_users`");
+        ctx.reply("⚠️ User list mein nahi mila. Dynamic Panel use karein: `/manage_users`");
     }
 });
 
@@ -464,7 +468,7 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
             let addedOffers = currentOffersRaw.filter(x => !instance.lastOffersRaw.includes(x));
             let removedOffers = instance.lastOffersRaw.filter(x => !currentOffersRaw.includes(x));
 
-            let offerChangeMsg = `CNB <b>BANK OFFER TEXT/VALUE CHANGED:</b>\n`;
+            let offerChangeMsg = `💳 <b>BANK OFFER TEXT/VALUE CHANGED:</b>\n`;
             if (addedOffers.length > 0) {
                 offerChangeMsg += `✅ <b>Naya Offer Add Hua:</b>\n${addedOffers.map(o => `👉 ${o}`).join('\n')}\n`;
             }
