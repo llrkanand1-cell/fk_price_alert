@@ -7,7 +7,7 @@ const path = require('path');
 // --- 🔒 CONFIGURATION HARDLOCKED ---
 const BOT_TOKEN = '8980239383:AAFwZVEzP0lTYoIG3-HYig4xTz47L1n0lXY'; 
 const ADMIN_CHAT_ID = '7485181331'; 
-const CHECK_INTERVAL = 15000; // 15 Seconds Loop
+const CHECK_INTERVAL = 15000; 
 const RENDER_URL = 'https://fk-financial-tracker.onrender.com'; 
 const DB_FILE = path.join(__dirname, 'database.json');
 // ----------------------------------------
@@ -47,6 +47,17 @@ function initDatabase() {
 
 initDatabase();
 
+function saveApprovedUsers(usersList) {
+    try {
+        const uniqueUsers = [...new Set(usersList.map(String))];
+        if (!uniqueUsers.includes(ADMIN_CHAT_ID.toString())) {
+            uniqueUsers.push(ADMIN_CHAT_ID.toString());
+        }
+        approvedUsersCache = uniqueUsers; 
+        fs.writeFileSync(DB_FILE, JSON.stringify(uniqueUsers, null, 2));
+    } catch (e) {}
+}
+
 function isUserApproved(userId) {
     if (!userId) return false;
     return approvedUsersCache.includes(userId.toString());
@@ -55,6 +66,8 @@ function isUserApproved(userId) {
 const app = express();
 const PORT = process.env.PORT || 10000;
 
+// Middleware explicitly bound
+app.use(express.json());
 app.use(bot.webhookCallback('/secret-telegram-webhook'));
 
 app.get('/', (req, res) => res.status(200).send('Financial Core Engine Webhook Live!'));
@@ -62,10 +75,12 @@ app.get('/', (req, res) => res.status(200).send('Financial Core Engine Webhook L
 app.listen(PORT, '0.0.0.0', async () => {
     console.log(`🚀 Core Server listening on port ${PORT}`);
     try {
+        // Force flush and apply webhook strictly
+        await bot.telegram.deleteWebhook({ drop_pending_updates: true });
         await bot.telegram.setWebhook(`${RENDER_URL}/secret-telegram-webhook`, {
             drop_pending_updates: true 
         });
-        console.log("🎯 Telegram Webhook binded successfully!");
+        console.log("🎯 Telegram Webhook and Approval Matrix binded successfully!");
     } catch (err) {
         console.log("⚠️ Webhook setup warning: ", err.message);
     }
@@ -82,14 +97,109 @@ const getProKeyboard = () => {
     ]).resize();
 };
 
+// 🔥 STRICT CALLBACK HANDLER FOR ADMIN ACTION BUTTONS
+bot.on('callback_query', async (ctx) => {
+    const data = ctx.callbackQuery.data;
+    const clickerId = ctx.from.id.toString();
+    
+    if (data.startsWith('approve_')) {
+        if (clickerId !== ADMIN_CHAT_ID.toString()) return ctx.answerCbQuery("Unauthorized! ❌").catch(() => {});
+        const targetUserId = data.split('_')[1].trim();
+        
+        initDatabase();
+        if (!approvedUsersCache.includes(targetUserId)) {
+            approvedUsersCache.push(targetUserId);
+            saveApprovedUsers(approvedUsersCache);
+        }
+        
+        await ctx.answerCbQuery("User Approved! ✅").catch(() => {});
+        await ctx.editMessageText(`${ctx.callbackQuery.message.text}\n\n✅ **Status: Approved!**`).catch(() => {});
+        bot.telegram.sendMessage(targetUserId, "🥳 **Aapka access approve ho gaya hai!**\nCommands use karne ke liye ek baar `/start` dabayein.").catch(() => {});
+        return;
+    }
+
+    if (data.startsWith('decline_')) {
+        if (clickerId !== ADMIN_CHAT_ID.toString()) return ctx.answerCbQuery("Unauthorized! ❌").catch(() => {});
+        await ctx.answerCbQuery("User Declined! ❌").catch(() => {});
+        await ctx.editMessageText(`${ctx.callbackQuery.message.text}\n\n❌ **Status: Declined!**`).catch(() => {});
+        return;
+    }
+});
+
+// 🔥 VERIFIED START FLOW
 bot.start((ctx) => {
     const userId = ctx.from.id.toString();
-    const name = `${ctx.from.first_name || ''}`.trim();
+    const name = `${ctx.from.first_name || ''} ${ctx.from.last_name || ''}`.trim() || 'No Name';
+    
+    initDatabase();
     if (isUserApproved(userId)) {
         delete userSessions[userId]; 
         return ctx.reply(`🤖 *Welcome Agent ${name}!* Price + Bank Tracker Active!`, getProKeyboard());
     }
-    ctx.reply(`🔒 **Access Denied!**`);
+    
+    // Explicit format fallback text to ensure ID visibility
+    ctx.reply(`🔒 **Access Denied!**\n\nAap abhi approved nahi hain.\nAapki Telegram ID: \`${userId}\`\n\nAdmin ko automatic request bhej di gayi hai, kripya thoda wait karein.`);
+    
+    // 🔥 LIVE ADMIN NOTIFICATION FORWARDER
+    bot.telegram.sendMessage(ADMIN_CHAT_ID, 
+        `🚨 **New Flipkart Bot Request!**\n\n👤 Name: ${name}\n🆔 ID: \`${userId}\`\n\n👉 Action lein:`,
+        Markup.inlineKeyboard([[
+            Markup.button.callback('Approve ✅', `approve_${userId}`), 
+            Markup.button.callback('Decline ❌', `decline_${userId}`)
+        ]])
+    ).catch(() => {});
+});
+
+bot.command('approve', (ctx) => {
+    if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) return ctx.reply("❌ Admin Only!");
+    const args = ctx.message.text.split(' ').filter(arg => arg.trim() !== '');
+    if (args.length < 2) return ctx.reply("⚠️ Format: `/approve <User_ID>`");
+    
+    const targetUserId = args[1].trim();
+    initDatabase();
+    if (!approvedUsersCache.includes(targetUserId)) {
+        approvedUsersCache.push(targetUserId);
+        saveApprovedUsers(approvedUsersCache);
+        ctx.reply(`✅ User ID \`${targetUserId}\` ko successfully approve kar diya gaya hai.`);
+        bot.telegram.sendMessage(targetUserId, "🥳 **Approved!** Use karne ke liye \`/start\` likhein.").catch(() => {});
+    } else {
+        ctx.reply("⚠️ Yeh user pehle se approved hai.");
+    }
+});
+
+bot.command('list_users', (ctx) => {
+    if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) return ctx.reply("❌ Admin Only!");
+    initDatabase();
+    if (approvedUsersCache.length <= 1) return ctx.reply("👥 Koyi approved user nahi hai.");
+    let msg = "👥 **Approved Users List:**\n\n";
+    let count = 1;
+    approvedUsersCache.forEach((userId) => {
+        if (userId !== ADMIN_CHAT_ID.toString()) {
+            msg += `${count}. 🆔 User ID: \`${userId}\`\n`;
+            count++;
+        }
+    });
+    ctx.reply(msg);
+});
+
+bot.command('remove_user', (ctx) => {
+    if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) return ctx.reply("❌ Admin Only!");
+    const args = ctx.message.text.split(' ').filter(arg => arg.trim() !== '');
+    if (args.length < 2) return ctx.reply("⚠️ Format: `/remove_user <User_ID>`");
+    const targetUserId = args[1].trim();
+    
+    initDatabase();
+    const index = approvedUsersCache.indexOf(targetUserId);
+    if (index > -1) {
+        approvedUsersCache.splice(index, 1);
+        saveApprovedUsers(approvedUsersCache);
+        if (activeUsers[targetUserId]) {
+            activeUsers[targetUserId].forEach(item => clearInterval(item.interval));
+            delete activeUsers[targetUserId];
+        }
+        ctx.reply(`✅ User ID ${targetUserId} remove ho gaya.`);
+        bot.telegram.sendMessage(targetUserId, "🔒 Admin ne aapka access remove kar diya hai.").catch(() => {});
+    } else { ctx.reply("⚠️ ID nahi mili."); }
 });
 
 bot.hears('🚀 Track Both', (ctx) => {
@@ -121,7 +231,7 @@ bot.on('text', async (ctx, next) => {
         const index = parseInt(numStr) - 1;
 
         if (isNaN(index) || !activeUsers[chatId] || !activeUsers[chatId][index]) {
-            return ctx.reply("⚠️ **Galat Target Number!** Pehle `📋 List Active` check karo boss.");
+            return ctx.reply("⚠️ **Galat Target Number!** Pehle \`📋 List Active\` check karo boss.");
         }
 
         const removedItem = activeUsers[chatId][index];
@@ -156,7 +266,7 @@ function setupCoreScraperSystem(ctx, fkLink, mode, modeLabel) {
         id: pid, url: fkLink, mode: modeLabel, interval: intervalId, lastPrice: null, lastOffers: null
     });
 
-    ctx.reply(`🕵️‍♂️ **Undercover Agent Active!**\n\nSelling Price check locked hai boss!`);
+    ctx.reply(`🕵️‍♂️ **Undercover Agent Active!**\n\nRaat ke test ke liye loop on ho gaya hai boss!`);
     checkFinancialFluctuations(ctx, chatId, pid, fkLink, mode);
 }
 
@@ -196,7 +306,6 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
         });
         const html = response.data;
         
-        // 🔥 STRICT SELLING PRICE FILTER: Mails only the active deal value, totally bypasses raw MRP
         let currentPrice = "N/A";
         const sellingPriceMatch = html.match(/"sellingPrice"\s*:\s*([0-9]+)/i) || 
                                   html.match(/"specialPrice"\s*:\s*([0-9]+)/i) ||
@@ -204,7 +313,6 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
                                   
         if (sellingPriceMatch) currentPrice = sellingPriceMatch[1];
 
-        // Strict Bank Offers Parser
         let currentOffersRaw = [];
         const offerRegex = /(?:bank offer|instant discount| cashback|off on credit card|off on debit card)[^<"']+/gi;
         let match;
@@ -241,4 +349,3 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
         }
     } catch (err) {}
 }
-            
