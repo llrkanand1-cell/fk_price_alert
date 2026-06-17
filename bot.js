@@ -15,6 +15,14 @@ const DB_FILE = path.join(__dirname, 'database.json');
 const bot = new Telegraf(BOT_TOKEN);
 const activeUsers = {};
 
+// 🔥 PERMANENT KEYBOARD PANEL SETUP (Bina type kiye ek click me kaam)
+const getProKeyboard = () => {
+    return Markup.keyboard([
+        ['🚀 Track Both', '🛵 Track Bank'],
+        ['📋 List Active', '🛑 Stop All Operations']
+    ]).resize(); // resize() se buttons phone screen ke hisab se perfectly fit ho jate hain
+};
+
 // --- 📂 PERMANENT FILE DATABASE LOGIC ---
 function loadApprovedUsers() {
     try {
@@ -84,39 +92,62 @@ bot.on('callback_query', async (ctx) => {
             currentList.push(targetUserId);
             saveApprovedUsers(currentList);
         }
-        await ctx.editMessageText(`${ctx.callbackQuery.message.text}\n\n✅ **Status: Approved Permanently!**`).catch(() => {});
-        await bot.telegram.sendMessage(targetUserId, "🎉 **Mubarak ho! Admin ne aapka access approve kar diya hai!**", { parse_mode: 'Markdown' }).catch(() => {});
+        await ctx.editMessageText(`${ctx.callbackQuery.message.text}\n\n✅ **Mission Status: Agent Activated Permanently!**`).catch(() => {});
+        
+        // 🔥 FIXED: Approve hote hi user ko permanent buttons panel gift mil jayega
+        await bot.telegram.sendMessage(targetUserId, "🎉 **Mubarak ho! Admin ne aapka secret access approve kar diya hai! Neeche diye gaye control panel se operation chalu karo.**", getProKeyboard()).catch(() => {});
     } else if (data.startsWith('decline_')) {
-        await ctx.editMessageText(`${ctx.callbackQuery.message.text}\n\n❌ **Status: Declined!**`).catch(() => {});
+        await ctx.editMessageText(`${ctx.callbackQuery.message.text}\n\n❌ **Mission Status: Access Request Burnt!**`).catch(() => {});
     }
     await ctx.answerCbQuery().catch(() => {});
 });
 
-// --- COMMANDS MATRIX ---
+// --- COMMANDS & KEYBOARD PANEL TEXT HANDLERS ---
 bot.start((ctx) => {
     const userId = ctx.from.id.toString();
     const name = `${ctx.from.first_name || ''}`.trim();
     
     if (isUserApproved(userId)) {
-        return ctx.reply(`🤖 *Welcome Agent ${name}!* Secret Financial Tracker Live!\n\n🔹 **Commands Matrix:**\n🚀 \`/track_both\` — Price + Bank Offers Monitor\n🛵 \`/track_bank\` — Only Bank Offers Alert\n📋 \`/list_track\` — Active tracking matrix\n🛑 \`/stop_all\` — Clear all tracking`, { parse_mode: 'Markdown' });
+        return ctx.reply(`🤖 *Welcome Agent ${name}!* Secret Control Panel Activated!\n\nNeeche diye gaye buttons par click karke direct use karo boss, ab kuch type karne ka jhanjhat nahi! 😎`, getProKeyboard());
     }
     
-    ctx.reply(`🔒 **Access Denied!** ID: \`${userId}\` \nAdmin ke paas request bhej di gayi hai.`);
-    bot.telegram.sendMessage(ADMIN_CHAT_ID, `🚨 **New Request Alert!**\nName: ${name}\nID: \`${userId}\``, {
-        ...Markup.inlineKeyboard([[Markup.button.callback('Approve ✅', `approve_${userId}`), Markup.button.callback('Decline ❌', `decline_${userId}`)]])
+    ctx.reply(`🔒 **Radar Blocked! Access Denied.**\n\nBhai, tu abhi secret network se bahar hai. Teri Request ID: \`${userId}\` ko cipher karke Admin (Loot Master) ke Control Room mein bhej diya gaya hai. Jab tak woh wahan se green signal nahi dete, tab tak chupchaap wait kar! 🤫`, { parse_mode: 'Markdown' });
+    
+    bot.telegram.sendMessage(ADMIN_CHAT_ID, `🚨 **Khufiya Report: New Agent Request!**\n\nControl Room Check! Ek naya banda secret network par aane ke liye line par aaya hai.\n👤 Name: *${name}*\n🆔 ID: \`${userId}\``, {
+        parse_mode: 'Markdown',
+        ...Markup.inlineKeyboard([[Markup.button.callback('Approve Permanent ✅', `approve_${userId}`), Markup.button.callback('Decline ❌', `decline_${userId}`)]])
     }).catch(() => {});
 });
 
-bot.command('track_both', async (ctx) => { setupTrackingEngine(ctx, 'both', 'Price + Deep Bank Offers'); });
-bot.command('track_bank', async (ctx) => { setupTrackingEngine(ctx, 'bankonly', 'Only Deep Bank Offers'); });
+// Dono commands text aur buttons dono ko support karengi
+bot.command('track_both', async (ctx) => { triggerTrackSetup(ctx, 'both', 'Price + Deep Bank Offers'); });
+bot.hears('🚀 Track Both', async (ctx) => { triggerTrackSetup(ctx, 'both', 'Price + Deep Bank Offers'); });
 
-function setupTrackingEngine(ctx, mode, modeLabel) {
+bot.command('track_bank', async (ctx) => { triggerTrackSetup(ctx, 'bankonly', 'Only Deep Bank Offers'); });
+bot.hears('🛵 Track Bank', async (ctx) => { triggerTrackSetup(ctx, 'bankonly', 'Only Deep Bank Offers'); });
+
+bot.command('list_track', (ctx) => { displayActiveTracks(ctx); });
+bot.hears('📋 List Active', (ctx) => { displayActiveTracks(ctx); });
+
+bot.command('stop_all', (ctx) => { killAllOperations(ctx); });
+bot.hears('🛑 Stop All Operations', (ctx) => { killAllOperations(ctx); });
+
+
+// Helper core functions
+function triggerTrackSetup(ctx, mode, modeLabel) {
     const userId = ctx.from.id.toString();
-    if (!isUserApproved(userId)) return; 
+    if (!isUserApproved(userId)) return;
     
+    // Agar direct button dabaya hai toh instruction denge
+    if (ctx.message.text === '🚀 Track Both') {
+        return ctx.reply("💡 **Track Both Chalu Karne Ka Tareeka:**\nType karein: `/track_both <Flipkart_URL>`");
+    }
+    if (ctx.message.text === '🛵 Track Bank') {
+        return ctx.reply("💡 **Track Bank Chalu Karne Ka Tareeka:**\nType karein: `/track_bank <Flipkart_URL>`");
+    }
+
     const chatId = ctx.chat.id.toString();
     const args = ctx.message.text.replace(/\n/g, ' ').split(' ').filter(arg => arg.trim() !== '');
-    
     let fkLink = args.find(arg => arg.includes('flipkart.com/'));
     
     if (!fkLink) return ctx.reply(`🕵️‍♂️ **Abe shaane agent, bandook le aaya par goli (link) kahan hai?**\nCommand ke aage space dekar Flipkart ka link toh chipka pehle! 🤐`, { parse_mode: 'Markdown' });
@@ -154,7 +185,7 @@ function setupTrackingEngine(ctx, mode, modeLabel) {
     checkFinancialFluctuations(ctx, chatId, pid, fkLink, mode);
 }
 
-bot.command('list_track', (ctx) => {
+function displayActiveTracks(ctx) {
     const userId = ctx.from.id.toString();
     if (!isUserApproved(userId)) return;
     const chatId = ctx.chat.id.toString();
@@ -165,9 +196,9 @@ bot.command('list_track', (ctx) => {
         msg += `${index + 1}. 📦 **ID:** \`${item.id}\` \n⚙️ **Mode:** \`[${item.mode}]\` \n🔗 **Link:** ${item.url}\n\n`;
     });
     ctx.reply(msg, { parse_mode: 'Markdown', disable_web_page_preview: true });
-});
+}
 
-bot.command('stop_all', (ctx) => {
+function killAllOperations(ctx) {
     const userId = ctx.from.id.toString();
     if (!isUserApproved(userId)) return;
     const chatId = ctx.chat.id.toString();
@@ -175,13 +206,13 @@ bot.command('stop_all', (ctx) => {
         activeUsers[chatId].forEach(item => clearInterval(item.interval));
         delete activeUsers[chatId];
         ctx.reply("🛑 Saare undercover agents ko headquarter wapas bula liya gya hai! Matrix cleared.");
-    } else { ctx.reply("⚠️ Koyi active tracking chal hi nahi rahi."); }
-});
+    } else { ctx.reply("⚠️ Koyi active operation chal hi nahi rahi."); }
+}
 
 // Admin commands with denied alerts
 bot.command('approve', (ctx) => {
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
-        return ctx.reply("❌ **Access Denied!** Yeh command sirf asli Admin (Loot Master) hi chala sakta hai. 😎");
+        return ctx.reply("❌ **Warning! Identity Verification Failed.**\nAbe shaane, yeh command sirf asli Loot Master (Admin) ke fingerprint par khulti hai. Chal peeche hatt! 👮‍♂️🔥");
     }
     const args = ctx.message.text.split(' ').filter(arg => arg.trim() !== '');
     if (args.length < 2) return ctx.reply("⚠️ Format: `/approve <user_id>`");
@@ -198,7 +229,7 @@ bot.command('approve', (ctx) => {
 
 bot.command('list_users', (ctx) => {
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
-        return ctx.reply("❌ **Access Denied!** Yeh command sirf asli Admin (Loot Master) hi chala sakta hai. 😎");
+        return ctx.reply("❌ **Warning! Identity Verification Failed.**\nAbe shaane, yeh command sirf asli Loot Master (Admin) ke fingerprint par khulti hai. Chal peeche hatt! 👮‍♂️🔥");
     }
     const currentList = loadApprovedUsers();
     let msg = "📋 **Approved Secret Agents Database List:**\n\n";
@@ -208,7 +239,7 @@ bot.command('list_users', (ctx) => {
 
 bot.command('remove_user', (ctx) => {
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
-        return ctx.reply("❌ **Access Denied!** Yeh command sirf asli Admin (Loot Master) hi chala sakta hai. 😎");
+        return ctx.reply("❌ **Warning! Identity Verification Failed.**\nAbe shaane, yeh command sirf asli Loot Master (Admin) ke fingerprint par khulti hai. Chal peeche hatt! 👮‍♂️🔥");
     }
     const args = ctx.message.text.split(' ').filter(arg => arg.trim() !== '');
     if (args.length < 2) return ctx.reply("⚠️ Format: `/remove_user <user_id>`");
@@ -300,7 +331,6 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
             let addedOffers = currentOffersRaw.filter(x => !instance.lastOffersRaw.includes(x));
             let removedOffers = instance.lastOffersRaw.filter(x => !currentOffersRaw.includes(x));
 
-            // ✨ FIXED: Faltu backtick hatakar string token bilkul correct kar diya hai yahan par
             let offerChangeMsg = `💳 **BANK OFFER TEXT/VALUE CHANGED:**\n`;
             if (addedOffers.length > 0) {
                 offerChangeMsg += `✅ **Naya Offer Add Hua:**\n${addedOffers.map(o => `👉 ${o}`).join('\n')}\n`;
@@ -338,4 +368,4 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
     } catch (err) {}
 }
 
-bot.launch().then(() => console.log("Spy Control 30s Loop Engine Connected..."));
+bot.launch().then(() => console.log("Spy Control Pro Keyboard Layout Live..."));
