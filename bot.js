@@ -125,7 +125,7 @@ bot.start((ctx) => {
     }).catch(() => {});
 });
 
-// --- 🔥 HIGH-PRIORITY COMMANDS ---
+// --- 🔥 HIGH-PRIORITY ADMIN COMMANDS ---
 bot.command('approve', (ctx) => {
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
         return ctx.reply("❌ **Warning! Identity Verification Failed.**\nAbe shaane, yeh command sirf asli Loot Master (Admin) ke fingerprint par khulti hai. Chal peeche hatt! 👮‍♂️🔥");
@@ -215,7 +215,7 @@ bot.hears('📋 List Active', (ctx) => { displayActiveTracks(ctx); });
 bot.hears('🛑 Stop All Operations', (ctx) => { killAllOperations(ctx); });
 
 
-// --- 🧠 FIXED INTERCEPTOR FOR SHORTCUTS & LINKS ---
+// --- 🧠 FIXED INTERCEPTOR FOR SHORTCUTS WITH/WITHOUT SPACE ---
 bot.on('text', async (ctx) => {
     const userId = ctx.from.id.toString();
     const chatId = ctx.chat.id.toString();
@@ -226,8 +226,8 @@ bot.on('text', async (ctx) => {
     if (['🚀 Track Both', '🛵 Track Bank', '📋 List Active', '🛑 Stop All Operations'].includes(textInput)) return;
     if (textInput.startsWith('/')) return;
 
-    // 🔥 SMART SHORTCUT HANDLER: "stop 1", "stop 2"
-    const stopMatch = textInput.match(/^stop\s+(\d+)$/i);
+    // 🔥 SMART SHORTCUT HANDLER: Ab "stop 1" aur "stop1" dono 100% chalenge!
+    const stopMatch = textInput.match(/^stop\s*(\d+)$/i); // \s* lagane se space ho ya na ho, farq nahi padta
     if (stopMatch) {
         const targetIndex = parseInt(stopMatch[1]) - 1;
         const currentActiveList = activeUsers[chatId] || activeUsers[userId] || [];
@@ -315,7 +315,7 @@ function setupCoreScraperSystem(ctx, fkLink, mode, modeLabel) {
     checkFinancialFluctuations(ctx, chatId, pid, fkLink, mode);
 }
 
-// --- 🔥 FIXED DISPLAY WITH MARKDOWN V2 CHARACTER ESCAPING (100% VISIBLE NOW) ---
+// --- 🔥 DISPLAY WITH SAFE URL ESCAPING ---
 function displayActiveTracks(ctx) {
     const userId = ctx.from.id.toString();
     const chatId = ctx.chat.id.toString();
@@ -329,7 +329,7 @@ function displayActiveTracks(ctx) {
     
     let msg = "📋 *Radar Par Locked Targets Matrix:*\n\n";
     currentList.forEach((item, index) => {
-        msg += `*${index + 1}\\.* 📦 *ID:* \`${escapeMarkdown(item.id)}\` \n⚙️ *Mode:* \`[${escapeMarkdown(item.mode)}]\` \n🔗 *Link:* [Click Here To Open](${item.url})\n👉 _Band karne ke liye likhein:_ \`stop ${index + 1}\` \n\n`;
+        msg += `*${index + 1}\\.* 📦 *ID:* \`${escapeMarkdown(item.id)}\` \n⚙️ *Mode:* \`[${escapeMarkdown(item.mode)}]\` \n🔗 *Link:* [Click Here To Open](${item.url})\n👉 _Band karne ke liye likhein:_ \`stop ${index + 1}\` ya \`stop${index + 1}\` \n\n`;
     });
     
     ctx.reply(msg, { parse_mode: 'MarkdownV2', disable_web_page_preview: true });
@@ -469,4 +469,5 @@ bot.launch({
     polling: {
         dropPendingUpdates: true 
     }
-}).then(() => console.log("Spy Control Pro Fully Running Fixed V2..."));
+}).then(() => console.log("Spy Control Pro Fully Running Fixed V3..."));
+        
