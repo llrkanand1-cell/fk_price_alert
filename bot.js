@@ -70,7 +70,7 @@ bot.on('callback_query', async (ctx) => {
             clearInterval(removedItem.interval);
             activeUsers[chatId].splice(index, 1);
             await ctx.answerCbQuery("Tracking band kar di gayi hai! 🛑").catch(() => {});
-            return ctx.reply(`🛑 Ok boss, tracking band kar di is link ki:\n${removedItem.url}`, { disable_web_page_preview: true });
+            return ctx.reply(`🛑 Mission Aborted! Undercover agent ko wapas bula liya gaya hai is link se:\n${removedItem.url}`, { disable_web_page_preview: true });
         }
         return ctx.answerCbQuery("⚠️ Already stopped.").catch(() => {});
     }
@@ -85,8 +85,6 @@ bot.on('callback_query', async (ctx) => {
             saveApprovedUsers(currentList);
         }
         await ctx.editMessageText(`${ctx.callbackQuery.message.text}\n\n✅ **Status: Approved Permanently!**`).catch(() => {});
-        
-        // 🔥 FIXED: Commands Matrix hata di hai, ab sirf clean simple message jaayega boss!
         await bot.telegram.sendMessage(targetUserId, "🎉 **Mubarak ho! Admin ne aapka access approve kar diya hai!**", { parse_mode: 'Markdown' }).catch(() => {});
     } else if (data.startsWith('decline_')) {
         await ctx.editMessageText(`${ctx.callbackQuery.message.text}\n\n❌ **Status: Declined!**`).catch(() => {});
@@ -100,7 +98,7 @@ bot.start((ctx) => {
     const name = `${ctx.from.first_name || ''}`.trim();
     
     if (isUserApproved(userId)) {
-        return ctx.reply(`🤖 *Welcome ${name}!* Fixed Financial Tracker Live!\n\n🔹 **Commands Matrix:**\n🚀 \`/track_both\` — Price + Bank Offers Monitor\n🛵 \`/track_bank\` — Only Bank Offers Alert\n📋 \`/list_track\` — Active tracking matrix\n🛑 \`/stop_all\` — Clear all tracking`, { parse_mode: 'Markdown' });
+        return ctx.reply(`🤖 *Welcome Agent ${name}!* Secret Financial Tracker Live!\n\n🔹 **Commands Matrix:**\n🚀 \`/track_both\` — Price + Bank Offers Monitor\n🛵 \`/track_bank\` — Only Bank Offers Alert\n📋 \`/list_track\` — Active tracking matrix\n🛑 \`/stop_all\` — Clear all tracking`, { parse_mode: 'Markdown' });
     }
     
     ctx.reply(`🔒 **Access Denied!** ID: \`${userId}\` \nAdmin ke paas request bhej di gayi hai.`);
@@ -120,7 +118,9 @@ function setupTrackingEngine(ctx, mode, modeLabel) {
     const args = ctx.message.text.replace(/\n/g, ' ').split(' ').filter(arg => arg.trim() !== '');
     
     let fkLink = args.find(arg => arg.includes('flipkart.com/'));
-    if (!fkLink) return ctx.reply(`❌ Format error! Command ke aage link space dekar bhejein. Example:\n\`/${ctx.command} https://flipkart.com/...\``, { parse_mode: 'Markdown' });
+    
+    // Funny Check agar bina link ke command bhej de
+    if (!fkLink) return ctx.reply(`🕵️‍♂️ **Abe shaane agent, bandook le aaya par goli (link) kahan hai?**\nCommand ke aage space dekar Flipkart ka link toh chipka pehle! 🤐`, { parse_mode: 'Markdown' });
     
     let pid = "";
     try {
@@ -135,7 +135,7 @@ function setupTrackingEngine(ctx, mode, modeLabel) {
     if (!pid) pid = Buffer.from(fkLink).toString('base64').substring(0, 10);
 
     if (!activeUsers[chatId]) activeUsers[chatId] = [];
-    if (activeUsers[chatId].some(item => item.id === pid)) return ctx.reply("⚠️ Abe ye product toh pehle se hi dauda rakha hai list me!");
+    if (activeUsers[chatId].some(item => item.id === pid)) return ctx.reply("⚠️ Abe ye target pehle se hi radar par locked hai!");
 
     const intervalId = setInterval(() => { checkFinancialFluctuations(ctx, chatId, pid, fkLink, mode); }, CHECK_INTERVAL);
 
@@ -150,7 +150,8 @@ function setupTrackingEngine(ctx, mode, modeLabel) {
         lastOffersRaw: []
     });
 
-    ctx.reply(`🎯 **Link Lock Ho Gya Bhai!**\n\n☕ Chal ab tu aaram se jaake **chai-wai piyo ya mast apni neend poori karo**, cheetah jaisi nazar laga di hai tere bhai ne. Jaise hi thoda sa bhi fluctuation hoga, tera bhai tere kaan ke neeche **alert baja baja kar** tujhe jaga dega! 😎🚀`);
+    // 🔥🔥🔥 EXCLUSIVE UNDERCOVER AGENT MODE ACTIVATION DIALOGUE 🔥🔥🔥
+    ctx.reply(`🕵️‍♂️ **Undercover Agent Active!**\n\nBhai, tu Flipkart waalon ke liye ek "secret spy" chhod raha hai. Woh log raat ko 2 baje bhi price badlenge ya bank discount ₹1500 se ₹2000 karenge na, toh tera bhai unki deewar kood kar tujhe khabar dega. \n\n☕ Chal ab tu aaram se jaake **chai-wai piyo ya mast neend poori karo**, unki lanka lagane ka kaam tere bhai par locked hai! 💣🚀`);
 
     checkFinancialFluctuations(ctx, chatId, pid, fkLink, mode);
 }
@@ -159,9 +160,9 @@ bot.command('list_track', (ctx) => {
     const userId = ctx.from.id.toString();
     if (!isUserApproved(userId)) return;
     const chatId = ctx.chat.id.toString();
-    if (!activeUsers[chatId] || activeUsers[chatId].length === 0) return ctx.reply("😴 Abhi koi link nahi chal raha, sab shant hai.");
+    if (!activeUsers[chatId] || activeUsers[chatId].length === 0) return ctx.reply("😴 Abhi koi target radar par nahi hai, sab shant hai.");
     
-    let msg = "📋 **Aapki Running Tracking Matrix:**\n\n";
+    let msg = "📋 **Radar Par Locked Targets Matrix:**\n\n";
     activeUsers[chatId].forEach((item, index) => {
         msg += `${index + 1}. 📦 **ID:** \`${item.id}\` \n⚙️ **Mode:** \`[${item.mode}]\` \n🔗 **Link:** ${item.url}\n\n`;
     });
@@ -175,14 +176,14 @@ bot.command('stop_all', (ctx) => {
     if (activeUsers[chatId] && activeUsers[chatId].length > 0) {
         activeUsers[chatId].forEach(item => clearInterval(item.interval));
         delete activeUsers[chatId];
-        ctx.reply("🛑 Saari active tracking ek jhatke me saaf kar di!");
-    } else { ctx.reply("⚠️ Koyi active tracking chal hi nahi rahi."); }
+        ctx.reply("🛑 Saare undercover agents ko headquarter wapas bula liya gya hai! Matrix cleared.");
+    } else { ctx.reply("⚠️ Koyi active operation chal hi nahi raha."); }
 });
 
-// Admin commands
+// Admin commands with denied alerts
 bot.command('approve', (ctx) => {
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
-        return ctx.reply("❌ **Access Denied!** Yeh command sirf asli Admin hi chala sakta hai.");
+        return ctx.reply("❌ **Access Denied!** Yeh command sirf asli Admin (Loot Master) hi chala sakta hai. 😎");
     }
     const args = ctx.message.text.split(' ').filter(arg => arg.trim() !== '');
     if (args.length < 2) return ctx.reply("⚠️ Format: `/approve <user_id>`");
@@ -191,25 +192,25 @@ bot.command('approve', (ctx) => {
     if (!currentList.includes(targetUserId)) {
         currentList.push(targetUserId);
         saveApprovedUsers(currentList);
-        ctx.reply(`✅ User \`${targetUserId}\` ko permanent access de diya gaya hai!`, { parse_mode: 'Markdown' });
+        ctx.reply(`✅ Agent \`${targetUserId}\` ko permanent mission access de diya gaya hai!`, { parse_mode: 'Markdown' });
     } else {
-        ctx.reply("⚠️ Yeh user pehle se hi approved hai.");
+        ctx.reply("⚠️ Yeh ID pehle se hi approved list mein hai.");
     }
 });
 
 bot.command('list_users', (ctx) => {
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
-        return ctx.reply("❌ **Access Denied!** Yeh command sirf asli Admin hi chala sakta hai.");
+        return ctx.reply("❌ **Access Denied!** Yeh command sirf asli Admin (Loot Master) hi chala sakta hai. 😎");
     }
     const currentList = loadApprovedUsers();
-    let msg = "📋 **Approved Users Database List:**\n\n";
+    let msg = "📋 **Approved Secret Agents Database List:**\n\n";
     currentList.forEach(u => msg += `- \`${u}\`\n`);
     ctx.reply(msg, { parse_mode: 'Markdown' });
 });
 
 bot.command('remove_user', (ctx) => {
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
-        return ctx.reply("❌ **Access Denied!** Yeh command sirf asli Admin hi chala sakta hai.");
+        return ctx.reply("❌ **Access Denied!** Yeh command sirf asli Admin (Loot Master) hi chala sakta hai. 😎");
     }
     const args = ctx.message.text.split(' ').filter(arg => arg.trim() !== '');
     if (args.length < 2) return ctx.reply("⚠️ Format: `/remove_user <user_id>`");
@@ -219,9 +220,9 @@ bot.command('remove_user', (ctx) => {
     if (idx !== -1) {
         currentList.splice(idx, 1);
         saveApprovedUsers(currentList);
-        ctx.reply(`❌ User \`${targetUserId}\` ka access permanent khatam kar diya gaya hai.`, { parse_mode: 'Markdown' });
+        ctx.reply(`❌ Agent \`${targetUserId}\` ka licence permanent cancel kar diya gaya hai.`, { parse_mode: 'Markdown' });
     } else {
-        ctx.reply("⚠️ Yeh ID approved users ki list mein nahi mili.");
+        ctx.reply("⚠️ Yeh ID agents ki list mein nahi mili.");
     }
 });
 
@@ -234,7 +235,7 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
     try {
         const response = await axios.get(originalUrl, {
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, Scientific/Gecko) Chrome/122.0.0.0 Safari/537.36',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
             },
             timeout: 12000 
@@ -301,7 +302,7 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
             let addedOffers = currentOffersRaw.filter(x => !instance.lastOffersRaw.includes(x));
             let removedOffers = instance.lastOffersRaw.filter(x => !currentOffersRaw.includes(x));
 
-            let offerChangeMsg = `💳 **BANK OFFER TEXT/VALUE CHANGED:**\n`;
+            let offerChangeMsg = ``💳 **BANK OFFER TEXT/VALUE CHANGED:**\n`;
             if (addedOffers.length > 0) {
                 offerChangeMsg += `✅ **Naya Offer Add Hua:**\n${addedOffers.map(o => `👉 ${o}`).join('\n')}\n`;
             }
@@ -338,4 +339,4 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
     } catch (err) {}
 }
 
-bot.launch().then(() => console.log("Silent 30s Loop Engine Connected..."));
+bot.launch().then(() => console.log("Spy Control 30s Loop Engine Connected..."));
