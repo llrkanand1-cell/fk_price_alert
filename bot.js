@@ -7,7 +7,7 @@ const path = require('path');
 // --- CONFIGURATION ---
 const BOT_TOKEN = '8980239383:AAFwZVEzP0lTYoIG3-HYig4xTz47L1n0lXY'; 
 const ADMIN_CHAT_ID = '7485181331'; 
-const CHECK_INTERVAL = 15000; // Har 15 second me accurate scan
+const CHECK_INTERVAL = 15000; 
 const RENDER_URL = 'https://fk-financial-tracker.onrender.com'; // Locked Live URL
 const DB_FILE = path.join(__dirname, 'database.json');
 // ---------------------
@@ -49,16 +49,15 @@ function isUserApproved(userId) {
 
 const app = express();
 const PORT = process.env.PORT || 10000;
-app.get('/', (req, res) => res.status(200).send('Financial Number Core Engine Live!'));
+app.get('/', (req, res) => res.status(200).send('Financial Core Engine Fixed Live!'));
 app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Port Binding Successful on ${PORT}`));
 
-// 🔥 30-SECOND NON-STOP JHATKA SYSTEM
+// 🔥🔥🔥 SILENT 30-SECOND NON-STOP JHATKA SYSTEM (NO LOGS IN DASHBOARD) 🔥🔥🔥
+// Yeh loop chupchaap server ko ping karega bina logs me kachra failaye
 setInterval(() => {
-    console.log("⚡ [Jhatka System] Sending self-ping to keep server hot and alive 24/7...");
-    axios.get(RENDER_URL)
-        .then(() => console.log("✅ [Jhatka System] Server is blazing hot and active!"))
-        .catch(() => console.log("⚠️ [Jhatka System] Self-ping heartbeat recorded.")); 
+    axios.get(RENDER_URL).catch(() => {}); 
 }, 30000); 
+// ---------------------------------------------------------------------
 
 // --- CALLBACK BUTTONS HANDLER ---
 bot.on('callback_query', async (ctx) => {
@@ -78,9 +77,7 @@ bot.on('callback_query', async (ctx) => {
         return ctx.answerCbQuery("⚠️ Already stopped.").catch(() => {});
     }
 
-    if (clickerId !== ADMIN_CHAT_ID.toString()) {
-        return ctx.answerCbQuery("❌ Unauthorized!").catch(() => {});
-    }
+    if (clickerId !== ADMIN_CHAT_ID.toString()) return ctx.answerCbQuery("❌ Unauthorized!").catch(() => {});
     const targetUserId = data.split('_')[1].trim();
     let currentList = loadApprovedUsers();
     
@@ -97,13 +94,13 @@ bot.on('callback_query', async (ctx) => {
     await ctx.answerCbQuery().catch(() => {});
 });
 
-// --- COMMAND: START ---
+// --- COMMANDS MATRIX ---
 bot.start((ctx) => {
     const userId = ctx.from.id.toString();
     const name = `${ctx.from.first_name || ''}`.trim();
     
     if (isUserApproved(userId)) {
-        return ctx.reply(`🤖 *Welcome ${name}!* Advanced Financial Tracker Live 24/7!\n\n🔹 **Commands:**\n🚀 \`/track_both <Flipkart_URL>\` — Price + Deep Bank Offers (Numbers & % Monitor)\n🛵 \`/track_bank <Flipkart_URL>\` — Only Deep Bank Offers Alert\n📋 \`/list_track\` — Active tracking matrix\n🛑 \`/stop_all\` — Band karein saari tracking`, { parse_mode: 'Markdown' });
+        return ctx.reply(`🤖 *Welcome ${name}!* Fixed Financial Tracker Live!\n\n🔹 **Commands:**\n🚀 \`/track_both <Flipkart_URL>\` — Price + Bank Offers Monitor\n🛵 \`/track_bank <Flipkart_URL>\` — Only Bank Offers Alert\n📋 \`/list_track\` — Active tracking matrix\n🛑 \`/stop_all\` — Clear all tracking`, { parse_mode: 'Markdown' });
     }
     
     ctx.reply(`🔒 **Access Denied!** ID: \`${userId}\` \nAdmin ke paas request bhej di gayi hai.`);
@@ -138,9 +135,7 @@ function setupTrackingEngine(ctx, mode, modeLabel) {
     if (!pid) pid = Buffer.from(fkLink).toString('base64').substring(0, 10);
 
     if (!activeUsers[chatId]) activeUsers[chatId] = [];
-    if (activeUsers[chatId].some(item => item.id === pid)) {
-        return ctx.reply("⚠️ Yeh product pehle se hi track ho raha hai!");
-    }
+    if (activeUsers[chatId].some(item => item.id === pid)) return ctx.reply("⚠️ Yeh product pe ... se hi track ho raha hai!");
 
     const intervalId = setInterval(() => { checkFinancialFluctuations(ctx, chatId, pid, fkLink, mode); }, CHECK_INTERVAL);
 
@@ -149,17 +144,19 @@ function setupTrackingEngine(ctx, mode, modeLabel) {
         url: fkLink,
         mode: modeLabel,
         interval: intervalId,
-        alertFired: false 
+        alertFired: false,
+        lastPrice: null,
+        lastOffers: null,
+        lastOffersRaw: []
     });
 
-    ctx.reply(`🚀 **Deep Monitoring Active!**\n⚙️ Mode: \`[${modeLabel}]\` \nHar 15 second me precise scanning chal rahi hai...`);
+    ctx.reply(`🚀 **Detailed Monitoring Active!**\n⚙️ Mode: \`[${modeLabel}]\` \nHar 15 second me accurate comparison chalu...`);
     checkFinancialFluctuations(ctx, chatId, pid, fkLink, mode);
 }
 
 bot.command('list_track', (ctx) => {
     const userId = ctx.from.id.toString();
     if (!isUserApproved(userId)) return ctx.reply("❌ Access Denied!");
-    
     const chatId = ctx.chat.id.toString();
     if (!activeUsers[chatId] || activeUsers[chatId].length === 0) return ctx.reply("😴 Koyi active links nahi hain.");
     
@@ -181,7 +178,7 @@ bot.command('stop_all', (ctx) => {
     } else { ctx.reply("⚠️ Koyi active tracking nahi mili."); }
 });
 
-// Admin panels
+// Admin commands
 bot.command('approve', (ctx) => {
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) return;
     const args = ctx.message.text.split(' ').filter(arg => arg.trim() !== '');
@@ -217,7 +214,7 @@ bot.command('remove_user', (ctx) => {
     }
 });
 
-// --- 🔥 HIGH-FIDELITY DEEP FINANCIAL MONITOR SCRAPER ---
+// --- 🔥 CORE BREAKDOWN SCRAPER ENGINE ---
 async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
     if (!activeUsers[chatId]) return;
     const itemIndex = activeUsers[chatId].findIndex(item => item.id === pid);
@@ -234,22 +231,34 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
 
         const html = response.data;
         
-        // 1. Exact Price Scraper
         let currentPrice = "N/A";
-        let priceMatch = html.match(/₹\s*[0-9,]+/);
-        if (priceMatch) currentPrice = priceMatch[0].trim().replace(/[^0-9]/g, '');
+        const jsonLdMatch = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i);
+        if (jsonLdMatch && jsonLdMatch[1]) {
+            try {
+                const jsonData = JSON.parse(jsonLdMatch[1].trim());
+                const itemData = Array.isArray(jsonData) ? jsonData.find(i => i["@type"] === "Product" || i.offers) : jsonData;
+                if (itemData && itemData.offers) {
+                    let priceVal = Array.isArray(itemData.offers) ? itemData.offers[0].price : itemData.offers.price;
+                    if (priceVal) currentPrice = String(priceVal).replace(/[^0-9]/g, '');
+                }
+            } catch (e) {}
+        }
+        if (currentPrice === "N/A") {
+            let priceMatch = html.match(/"price"\s*:\s*"?([0-9]+)"?/i);
+            if (priceMatch) currentPrice = priceMatch[1];
+        }
 
-        // 2. Deep Numbers & % Bank Offer Extraction Logic
-        let foundOffers = [];
-        // Heavy multi-layer regex captures exact EMI terms, instant cash, percent metrics, and hard values
-        const deepOfferRegex = /(?:bank offer|instant discount| cashback|off on credit card|off on debit card|emi)[^<]+/gi;
+        let currentOffersRaw = [];
+        const offerRegex = /(?:bank offer|instant discount| cashback|off on credit card|off on debit card|emi)[^<"'\x7b\x7d\(\)]+/gi;
         let match;
         let combinedOffersText = "";
         
-        while ((match = deepOfferRegex.exec(html)) !== null && foundOffers.length < 5) {
-            let cleanOffer = match[0].replace(/<\/?[^>]+(>|$)/g, "").trim().substring(0, 100);
-            if (cleanOffer.length > 10 && !foundOffers.includes(cleanOffer)) {
-                foundOffers.push(cleanOffer);
+        while ((match = offerRegex.exec(html)) !== null && currentOffersRaw.length < 5) {
+            let cleanOffer = match[0].replace(/<\/?[^>]+(>|$)/g, "").trim();
+            cleanOffer = cleanOffer.replace(/[a-zA-Z0-9\-_.]+\.[a-zA-Z0-9]+.*/g, "").trim();
+            
+            if (cleanOffer.length > 12 && cleanOffer.length < 120 && !currentOffersRaw.includes(cleanOffer) && !cleanOffer.includes('font-family') && !cleanOffer.includes('emit')) {
+                currentOffersRaw.push(cleanOffer);
                 combinedOffersText += `🔹 ${cleanOffer}\n`;
             }
         }
@@ -257,39 +266,56 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
 
         let instance = activeUsers[chatId][itemIndex];
 
-        // Set baseline strings on very first loop execution
-        if (!instance.lastPrice && !instance.lastOffers) {
+        if (instance.lastPrice === null && instance.lastOffers === null) {
             instance.lastPrice = currentPrice;
             instance.lastOffers = combinedOffersText;
+            instance.lastOffersRaw = currentOffersRaw;
             return;
         }
 
         let isFluctuationDetected = false;
-        let alertMessageText = "";
+        let changeLogs = [];
 
         if (mode === 'both') {
             if (currentPrice !== "N/A" && instance.lastPrice !== "N/A" && currentPrice !== instance.lastPrice) {
                 isFluctuationDetected = true;
-                alertMessageText = `💰 **PRICE DROPPED / CHANGED!** 💰\n\n📉 Old Price: ₹${instance.lastPrice}\n📈 New Price: ₹${currentPrice}`;
-            } else if (combinedOffersText !== instance.lastOffers) {
-                isFluctuationDetected = true;
-                alertMessageText = `💳 **BANK OFFER VALUE / % FLUCTUATION!** 💳\n\n⚠️ *Bhai exact bank offers or numbers me badlav hua hai!*\n\n📝 Old Setup:\n${instance.lastOffers}\n\n📝 New Setup:\n${combinedOffersText}`;
-            }
-        } else if (mode === 'bankonly') {
-            if (combinedOffersText !== instance.lastOffers) {
-                isFluctuationDetected = true;
-                alertMessageText = `💳 **BANK OFFER EXCLUSIVE BREAKDOWN CHANGED!** 💳\n\n📝 Old Values:\n${instance.lastOffers}\n\n📝 New Values:\n${combinedOffersText}`;
+                changeLogs.push(`💰 **PRICE CHANGE DETECTED:**\n📉 Old Price: ₹${instance.lastPrice}\n📈 New Price: ₹${currentPrice}`);
             }
         }
 
-        // --- RELENTLESS SPAMMING ALARM LOOP ---
-        if (isFluctuationDetected || instance.alertFired === true) {
-            instance.alertFired = true; // Lock state for ongoing 15 sec nagging alerts
-
-            let priceDisplay = currentPrice !== "N/A" ? `₹${currentPrice}` : "N/A";
+        if (combinedOffersText !== instance.lastOffers) {
+            isFluctuationDetected = true;
             
+            let addedOffers = currentOffersRaw.filter(x => !instance.lastOffersRaw.includes(x));
+            let removedOffers = instance.lastOffersRaw.filter(x => !currentOffersRaw.includes(x));
+
+            let offerChangeMsg = `💳 **BANK OFFER TEXT/VALUE CHANGED:**\n`;
+            if (addedOffers.length > 0) {
+                offerChangeMsg += `✅ **Naya Offer Add Hua:**\n${addedOffers.map(o => `👉 ${o}`).join('\n')}\n`;
+            }
+            if (removedOffers.length > 0) {
+                offerChangeMsg += `❌ **Purana Offer Hat Gya:**\n${removedOffers.map(o => `👉 ${o}`).join('\n')}\n`;
+            }
+            if (addedOffers.length === 0 && removedOffers.length === 0) {
+                offerChangeMsg += `⚠️ *Offers ke numeric values/EMI conditions badle hain!*`;
+            }
+            changeLogs.push(offerChangeMsg);
+        }
+
+        if (isFluctuationDetected || instance.alertFired === true) {
+            if (isFluctuationDetected && !instance.savedChangeLogs) {
+                instance.savedChangeLogs = changeLogs.join('\n\n');
+                instance.lastPrice = currentPrice;
+                instance.lastOffers = combinedOffersText;
+                instance.lastOffersRaw = currentOffersRaw;
+            }
+            
+            instance.alertFired = true; 
+            let priceDisplay = currentPrice !== "N/A" ? `₹${currentPrice}` : "N/A";
+            let displayLogs = instance.savedChangeLogs || `⚠️ *System Alert:* Fluctuations observed!`;
+
             await bot.telegram.sendMessage(chatId, 
-                `🔥 **Oo bhaiiii price ya offers badal gya hai jldi ja lgake lgane!** 🔥\n\n${alertMessageText || '⚠️ *System Alert:* Numbers/Percentage changed live!'}\n\n📊 **Current Live Snapshot:**\n💰 Price: *${priceDisplay}*\n🏛️ Live Bank Terms:\n${combinedOffersText}\n\nLink:\n${originalUrl}`,
+                `🔥 **Oo bhaiiii price ya offers badal gya hai jldi ja lgake lgane!** 🔥\n\n${displayLogs}\n\n📊 **Current Live Snapshot:**\n💰 Price: *${priceDisplay}*\n🏛️ Live Bank Terms:\n${combinedOffersText}\n\nLink:\n${originalUrl}`,
                 {
                     parse_mode: 'Markdown',
                     ...Markup.inlineKeyboard([[Markup.button.callback('Stop Tracking 🛑', `stop_fk_${itemIndex}`)]])
@@ -300,4 +326,4 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
     } catch (err) {}
 }
 
-bot.launch().then(() => console.log("Deep Financial Master System Online..."));
+bot.launch().then(() => console.log("Silent 24/7 Engine Connected..."));
