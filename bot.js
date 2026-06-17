@@ -86,8 +86,8 @@ bot.on('callback_query', async (ctx) => {
         }
         await ctx.editMessageText(`${ctx.callbackQuery.message.text}\n\n✅ **Status: Approved Permanently!**`).catch(() => {});
         
-        // 🔥🔥🔥 FIXED: Yahan aapki demand ke hisab se text matrix ko ekdum underscore (_) ke saath fix kar diya hai! 🔥🔥🔥
-        await bot.telegram.sendMessage(targetUserId, "🎉 **Mubarak ho! Admin ne aapka access approve kar diya hai!**\n\n👉 **Bot Commands Matrix:**\n💰 /track_both — Price + Bank Offers Monitor\n💳 /track_bank — Only Bank Offers Alert\n📋 /list_track — Active tracking matrix\n🛑 /stop_all — Clear all tracking", { parse_mode: 'Markdown' }).catch(() => {});
+        // 🔥 FIXED: Commands Matrix hata di hai, ab sirf clean simple message jaayega boss!
+        await bot.telegram.sendMessage(targetUserId, "🎉 **Mubarak ho! Admin ne aapka access approve kar diya hai!**", { parse_mode: 'Markdown' }).catch(() => {});
     } else if (data.startsWith('decline_')) {
         await ctx.editMessageText(`${ctx.callbackQuery.message.text}\n\n❌ **Status: Declined!**`).catch(() => {});
     }
@@ -179,7 +179,7 @@ bot.command('stop_all', (ctx) => {
     } else { ctx.reply("⚠️ Koyi active tracking chal hi nahi rahi."); }
 });
 
-// Admin commands with denied alerts
+// Admin commands
 bot.command('approve', (ctx) => {
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
         return ctx.reply("❌ **Access Denied!** Yeh command sirf asli Admin hi chala sakta hai.");
@@ -269,7 +269,8 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
             cleanOffer = cleanOffer.replace(/[a-zA-Z0-9\-_.]+\.[a-zA-Z0-9]+.*/g, "").trim();
             
             if (cleanOffer.length > 12 && cleanOffer.length < 120 && !currentOffersRaw.includes(cleanOffer) && !cleanOffer.includes('font-family') && !cleanOffer.includes('emit')) {
-                currentOffersRaw.push(cleanOffer);
+                currentOffersRaw.push(currentOffersRaw.length);
+                currentOffersRaw[currentOffersRaw.length - 1] = cleanOffer;
                 combinedOffersText += `🔹 ${cleanOffer}\n`;
             }
         }
