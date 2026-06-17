@@ -85,6 +85,8 @@ bot.on('callback_query', async (ctx) => {
             saveApprovedUsers(currentList);
         }
         await ctx.editMessageText(`${ctx.callbackQuery.message.text}\n\n✅ **Status: Approved Permanently!**`).catch(() => {});
+        
+        // 🔥🔥🔥 FIXED: Yahan aapki demand ke hisab se text matrix ko ekdum underscore (_) ke saath fix kar diya hai! 🔥🔥🔥
         await bot.telegram.sendMessage(targetUserId, "🎉 **Mubarak ho! Admin ne aapka access approve kar diya hai!**\n\n👉 **Bot Commands Matrix:**\n💰 /track_both — Price + Bank Offers Monitor\n💳 /track_bank — Only Bank Offers Alert\n📋 /list_track — Active tracking matrix\n🛑 /stop_all — Clear all tracking", { parse_mode: 'Markdown' }).catch(() => {});
     } else if (data.startsWith('decline_')) {
         await ctx.editMessageText(`${ctx.callbackQuery.message.text}\n\n❌ **Status: Declined!**`).catch(() => {});
@@ -177,7 +179,7 @@ bot.command('stop_all', (ctx) => {
     } else { ctx.reply("⚠️ Koyi active tracking chal hi nahi rahi."); }
 });
 
-// --- 🔥 FIXED ADMIN VALIDATIONS WITH EXPLICIT DENIED MESSAGES 🔥 ---
+// Admin commands with denied alerts
 bot.command('approve', (ctx) => {
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
         return ctx.reply("❌ **Access Denied!** Yeh command sirf asli Admin hi chala sakta hai.");
@@ -223,7 +225,7 @@ bot.command('remove_user', (ctx) => {
     }
 });
 
-// --- 🔥 CORE BREAKDOWN SCRAPER ENGINE ---
+// --- 🔬 CORE BREAKDOWN SCRAPER ENGINE ---
 async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
     if (!activeUsers[chatId]) return;
     const itemIndex = activeUsers[chatId].findIndex(item => item.id === pid);
