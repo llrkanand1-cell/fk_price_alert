@@ -16,6 +16,12 @@ const bot = new Telegraf(BOT_TOKEN);
 const activeUsers = {};
 const userSessions = {}; // Handles user tracking state silently
 
+// Helper to escape special MarkdownV2 characters safely
+function escapeMarkdown(text) {
+    if (!text) return '';
+    return String(text).replace(/[_*\[\]()~`>#+\-=|{}.!]/g, '\\$&');
+}
+
 // Permanent Panel Buttons Layout
 const getProKeyboard = () => {
     return Markup.keyboard([
@@ -119,7 +125,7 @@ bot.start((ctx) => {
     }).catch(() => {});
 });
 
-// --- 🔥 ADMIN COMMANDS ---
+// --- 🔥 HIGH-PRIORITY COMMANDS ---
 bot.command('approve', (ctx) => {
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
         return ctx.reply("❌ **Warning! Identity Verification Failed.**\nAbe shaane, yeh command sirf asli Loot Master (Admin) ke fingerprint par khulti hai. Chal peeche hatt! 👮‍♂️🔥");
@@ -185,13 +191,12 @@ bot.command('remove_user', async (ctx) => {
     }
 });
 
-// --- TRACKING LINKING PLATFORM COMMANDS ---
+// --- PLATFORM SHORTCUT LINKING ---
 bot.command('track_both', async (ctx) => { handleLegacyCommands(ctx, 'both', 'Price + Deep Bank Offers'); });
 bot.command('track_bank', async (ctx) => { handleLegacyCommands(ctx, 'bankonly', 'Only Deep Bank Offers'); });
 bot.command('list_track', (ctx) => { displayActiveTracks(ctx); });
 bot.command('stop_all', (ctx) => { killAllOperations(ctx); });
 
-// PANEL HEARS REGISTERED
 bot.hears('🚀 Track Both', (ctx) => {
     const userId = ctx.from.id.toString();
     if (!isUserApproved(userId)) return;
@@ -210,7 +215,7 @@ bot.hears('📋 List Active', (ctx) => { displayActiveTracks(ctx); });
 bot.hears('🛑 Stop All Operations', (ctx) => { killAllOperations(ctx); });
 
 
-// --- 🧠 FIXED SMART TEXT INTERCEPTOR SYSTEM ---
+// --- 🧠 FIXED INTERCEPTOR FOR SHORTCUTS & LINKS ---
 bot.on('text', async (ctx) => {
     const userId = ctx.from.id.toString();
     const chatId = ctx.chat.id.toString();
@@ -218,30 +223,27 @@ bot.on('text', async (ctx) => {
 
     const textInput = ctx.message.text.trim();
 
-    // Skip Buttons strings and command formats
     if (['🚀 Track Both', '🛵 Track Bank', '📋 List Active', '🛑 Stop All Operations'].includes(textInput)) return;
     if (textInput.startsWith('/')) return;
 
-    // 🔥 SMART SHORTCUT: "stop 1", "stop 2" handler fixed formatting
+    // 🔥 SMART SHORTCUT HANDLER: "stop 1", "stop 2"
     const stopMatch = textInput.match(/^stop\s+(\d+)$/i);
     if (stopMatch) {
         const targetIndex = parseInt(stopMatch[1]) - 1;
-        
-        // Dono formats check karo: chatId aur userId string
-        const currentActiveList = activeUsers[chatId] || activeUsers[userId];
+        const currentActiveList = activeUsers[chatId] || activeUsers[userId] || [];
         const activeKey = activeUsers[chatId] ? chatId : userId;
 
         if (currentActiveList && currentActiveList[targetIndex]) {
             const removedItem = currentActiveList[targetIndex];
-            clearInterval(removedItem.interval); // Stop loop
-            activeUsers[activeKey].splice(targetIndex, 1); // Delete from RAM array
-            return ctx.reply(`🛑 Ok boss, tracking band kar di item number **${targetIndex + 1}** ki:\n${removedItem.url}`, { parse_mode: 'Markdown', disable_web_page_preview: true });
+            clearInterval(removedItem.interval); 
+            activeUsers[activeKey].splice(targetIndex, 1); 
+            return ctx.reply(`🛑 Ok boss, tracking band kar di item number **${targetIndex + 1}** ki\\!`, { parse_mode: 'MarkdownV2' });
         } else {
-            return ctx.reply(`⚠️ Bhai, is number (**${targetIndex + 1}**) par koi active target radar par nahi mila. \`📋 List Active\` daba kar matrix dekho.`);
+            return ctx.reply(`⚠️ Bhai, is number (**${targetIndex + 1}**) par koi active target radar par nahi mila. \`📋 List Active\` check karo.`);
         }
     }
 
-    // Process incoming link tracker
+    // Link Process Block
     if (userSessions[userId]) {
         const mode = userSessions[userId];
         const modeLabel = mode === 'both' ? 'Price + Deep Bank Offers' : 'Only Deep Bank Offers';
@@ -287,8 +289,8 @@ function setupCoreScraperSystem(ctx, fkLink, mode, modeLabel) {
     }
     if (!pid) pid = Buffer.from(fkLink).toString('base64').substring(0, 10);
 
-    // Initial setup for both tracking keys to avoid data missing
     if (!activeUsers[chatId]) activeUsers[chatId] = [];
+    if (!activeUsers[userId]) activeUsers[userId] = [];
     
     if (activeUsers[chatId].some(item => item.id === pid)) return ctx.reply("⚠️ Abe ye target pehle se hi radar par locked hai!");
 
@@ -306,30 +308,31 @@ function setupCoreScraperSystem(ctx, fkLink, mode, modeLabel) {
     };
 
     activeUsers[chatId].push(trackingObject);
+    if (chatId !== userId) activeUsers[userId].push(trackingObject);
 
     ctx.reply(`🕵️‍♂️ **Undercover Agent Active!**\n\nBhai, tu Flipkart waalon ke liye ek "secret spy" chhod raha hai. \n\n☕ Chal ab tu aaram se jaake **chai-wai piyo ya mast neend poori karo**, unki lanka lagane ka kaam tere bhai par locked hai! 💣🚀`);
 
     checkFinancialFluctuations(ctx, chatId, pid, fkLink, mode);
 }
 
-// --- 🔥 FIXED DISPLAY ACTIVE TRACKS (CHUN CHUN KAR DATA FETCH KAREGA) ---
+// --- 🔥 FIXED DISPLAY WITH MARKDOWN V2 CHARACTER ESCAPING (100% VISIBLE NOW) ---
 function displayActiveTracks(ctx) {
     const userId = ctx.from.id.toString();
     const chatId = ctx.chat.id.toString();
     if (!isUserApproved(userId)) return;
     
-    // Memory fetch fallbacks
     const currentList = activeUsers[chatId] || activeUsers[userId] || [];
     
     if (currentList.length === 0) {
         return ctx.reply("😴 Abhi koi target radar par nahi hai, sab shant hai.");
     }
     
-    let msg = "📋 **Radar Par Locked Targets Matrix:**\n\n";
+    let msg = "📋 *Radar Par Locked Targets Matrix:*\n\n";
     currentList.forEach((item, index) => {
-        msg += `*${index + 1}.* 📦 **ID:** \`${item.id}\` \n⚙️ **Mode:** \`[${item.mode}]\` \n🔗 **Link:** ${item.url}\n👉 *Band karne ke liye likhein:* \`stop ${index + 1}\` \n\n`;
+        msg += `*${index + 1}\\.* 📦 *ID:* \`${escapeMarkdown(item.id)}\` \n⚙️ *Mode:* \`[${escapeMarkdown(item.mode)}]\` \n🔗 *Link:* [Click Here To Open](${item.url})\n👉 _Band karne ke liye likhein:_ \`stop ${index + 1}\` \n\n`;
     });
-    ctx.reply(msg, { parse_mode: 'Markdown', disable_web_page_preview: true });
+    
+    ctx.reply(msg, { parse_mode: 'MarkdownV2', disable_web_page_preview: true });
 }
 
 function killAllOperations(ctx) {
@@ -466,4 +469,4 @@ bot.launch({
     polling: {
         dropPendingUpdates: true 
     }
-}).then(() => console.log("Spy Control Pro Clean Setup Live..."));
+}).then(() => console.log("Spy Control Pro Fully Running Fixed V2..."));
