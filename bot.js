@@ -125,7 +125,7 @@ bot.start((ctx) => {
     }).catch(() => {});
 });
 
-// --- 🔥 HIGH-PRIORITY ADMIN COMMANDS ---
+// --- HIGH-PRIORITY ADMIN COMMANDS ---
 bot.command('approve', (ctx) => {
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
         return ctx.reply("❌ **Warning! Identity Verification Failed.**\nAbe shaane, yeh command sirf asli Loot Master (Admin) ke fingerprint par khulti hai. Chal peeche hatt! 👮‍♂️🔥");
@@ -191,7 +191,7 @@ bot.command('remove_user', async (ctx) => {
     }
 });
 
-// --- PLATFORM SHORTCUT LINKING ---
+// PLATFORM SHORTCUT LINKING
 bot.command('track_both', async (ctx) => { handleLegacyCommands(ctx, 'both', 'Price + Deep Bank Offers'); });
 bot.command('track_bank', async (ctx) => { handleLegacyCommands(ctx, 'bankonly', 'Only Deep Bank Offers'); });
 bot.command('list_track', (ctx) => { displayActiveTracks(ctx); });
@@ -214,8 +214,7 @@ bot.hears('🛵 Track Bank', (ctx) => {
 bot.hears('📋 List Active', (ctx) => { displayActiveTracks(ctx); });
 bot.hears('🛑 Stop All Operations', (ctx) => { killAllOperations(ctx); });
 
-
-// --- 🧠 FIXED INTERCEPTOR FOR SHORTCUTS WITH/WITHOUT SPACE ---
+// --- 🧠 INTERCEPTOR FOR SHORTCUTS & LINKS ---
 bot.on('text', async (ctx) => {
     const userId = ctx.from.id.toString();
     const chatId = ctx.chat.id.toString();
@@ -226,8 +225,8 @@ bot.on('text', async (ctx) => {
     if (['🚀 Track Both', '🛵 Track Bank', '📋 List Active', '🛑 Stop All Operations'].includes(textInput)) return;
     if (textInput.startsWith('/')) return;
 
-    // 🔥 SMART SHORTCUT HANDLER: Ab "stop 1" aur "stop1" dono 100% chalenge!
-    const stopMatch = textInput.match(/^stop\s*(\d+)$/i); // \s* lagane se space ho ya na ho, farq nahi padta
+    // SMART SHORTCUT HANDLER: stop1, stop 1
+    const stopMatch = textInput.match(/^stop\s*(\d+)$/i); 
     if (stopMatch) {
         const targetIndex = parseInt(stopMatch[1]) - 1;
         const currentActiveList = activeUsers[chatId] || activeUsers[userId] || [];
@@ -243,7 +242,6 @@ bot.on('text', async (ctx) => {
         }
     }
 
-    // Link Process Block
     if (userSessions[userId]) {
         const mode = userSessions[userId];
         const modeLabel = mode === 'both' ? 'Price + Deep Bank Offers' : 'Only Deep Bank Offers';
@@ -263,7 +261,6 @@ bot.on('text', async (ctx) => {
         }
     }
 });
-
 
 // Helper execution engine blocks
 function handleLegacyCommands(ctx, mode, modeLabel) {
@@ -315,7 +312,6 @@ function setupCoreScraperSystem(ctx, fkLink, mode, modeLabel) {
     checkFinancialFluctuations(ctx, chatId, pid, fkLink, mode);
 }
 
-// --- 🔥 DISPLAY WITH SAFE URL ESCAPING ---
 function displayActiveTracks(ctx) {
     const userId = ctx.from.id.toString();
     const chatId = ctx.chat.id.toString();
@@ -352,7 +348,7 @@ function killAllOperations(ctx) {
     }
 }
 
-// --- 🔬 CORE BREAKDOWN SCRAPER ENGINE ---
+// --- 🔬 CORE BREAKDOWN SCRAPER ENGINE (UPDATED FOR DEEP BUY PRICE MATCHING) ---
 async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
     const currentList = activeUsers[chatId] || [];
     const itemIndex = currentList.findIndex(item => item.id === pid);
@@ -369,7 +365,10 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
 
         const html = response.data;
         
+        // 🔥 FIXED: Direct "Price to Buy" Target Engine
         let currentPrice = "N/A";
+        
+        // 1. Pehle page ke hidden JSON data se Selling price nikaalte hain
         const jsonLdMatch = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i);
         if (jsonLdMatch && jsonLdMatch[1]) {
             try {
@@ -377,13 +376,15 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
                 const itemData = Array.isArray(jsonData) ? jsonData.find(i => i["@type"] === "Product" || i.offers) : jsonData;
                 if (itemData && itemData.offers) {
                     let priceVal = Array.isArray(itemData.offers) ? itemData.offers[0].price : itemData.offers.price;
-                    if (priceVal) currentPrice = String(priceVal).replace(/[^0-9]/g, '');
+                    if (priceVal) currentPrice = String(priceVal).replace(/[^0-9]/g, '').trim();
                 }
             } catch (e) {}
         }
-        if (currentPrice === "N/A") {
+        
+        // 2. Fallback: Agar upar se nahi mila toh seedha strict "price" variable fetch karte hain (Jo actual buying price hoti hai)
+        if (currentPrice === "N/A" || currentPrice === "") {
             let priceMatch = html.match(/"price"\s*:\s*"?([0-9]+)"?/i);
-            if (priceMatch) currentPrice = priceMatch[1];
+            if (priceMatch) currentPrice = priceMatch[1].trim();
         }
 
         let currentOffersRaw = [];
@@ -405,8 +406,11 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
 
         let instance = currentList[itemIndex];
 
+        // System Initialization
         if (instance.lastPrice === null && instance.lastOffers === null) {
-            instance.lastPrice = currentPrice;
+            if (currentPrice !== "N/A" && currentPrice !== "") {
+                instance.lastPrice = currentPrice;
+            }
             instance.lastOffers = combinedOffersText;
             instance.lastOffersRaw = currentOffersRaw;
             return;
@@ -415,42 +419,44 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
         let isFluctuationDetected = false;
         let changeLogs = [];
 
+        // Strict Price Comparison (Only real Price To Buy drops triggers alert)
         if (mode === 'both') {
-            if (currentPrice !== "N/A" && instance.lastPrice !== "N/A" && currentPrice !== instance.lastPrice) {
+            if (currentPrice !== "N/A" && currentPrice !== "" && instance.lastPrice !== null && instance.lastPrice !== "N/A" && currentPrice !== instance.lastPrice) {
                 isFluctuationDetected = true;
                 changeLogs.push(`💰 **PRICE CHANGE DETECTED:**\n📉 Old Price: ₹${instance.lastPrice}\n📈 New Price: ₹${currentPrice}`);
             }
         }
 
         if (combinedOffersText !== instance.lastOffers) {
-            isFluctuationDetected = true;
-            
-            let addedOffers = currentOffersRaw.filter(x => !instance.lastOffersRaw.includes(x));
-            let removedOffers = instance.lastOffersRaw.filter(x => !currentOffersRaw.includes(x));
+            if (combinedOffersText !== "No active bank offers detected on page." || instance.lastOffersRaw.length > 0) {
+                isFluctuationDetected = true;
+                let addedOffers = currentOffersRaw.filter(x => !instance.lastOffersRaw.includes(x));
+                let removedOffers = instance.lastOffersRaw.filter(x => !currentOffersRaw.includes(x));
 
-            let offerChangeMsg = `💳 **BANK OFFER TEXT/VALUE CHANGED:**\n`;
-            if (addedOffers.length > 0) {
-                offerChangeMsg += `✅ **Naya Offer Add Hua:**\n${addedOffers.map(o => `👉 ${o}`).join('\n')}\n`;
+                let offerChangeMsg = `💳 **BANK OFFER TEXT/VALUE CHANGED:**\n`;
+                if (addedOffers.length > 0) {
+                    offerChangeMsg += `✅ **Naya Offer Add Hua:**\n${addedOffers.map(o => `👉 ${o}`).join('\n')}\n`;
+                }
+                if (removedOffers.length > 0) {
+                    offerChangeMsg += `❌ **Purana Offer Hat Gya:**\n${removedOffers.map(o => `👉 ${o}`).join('\n')}\n`;
+                }
+                if (addedOffers.length === 0 && removedOffers.length === 0) {
+                    offerChangeMsg += `⚠️ *Offers ke numeric values/EMI conditions badle hain!*`;
+                }
+                changeLogs.push(offerChangeMsg);
             }
-            if (removedOffers.length > 0) {
-                offerChangeMsg += `❌ **Purana Offer Hat Gya:**\n${removedOffers.map(o => `👉 ${o}`).join('\n')}\n`;
-            }
-            if (addedOffers.length === 0 && removedOffers.length === 0) {
-                offerChangeMsg += `⚠️ *Offers ke numeric values/EMI conditions badle hain!*`;
-            }
-            changeLogs.push(offerChangeMsg);
         }
 
-        if (isFluctuationDetected || instance.alertFired === true) {
-            if (isFluctuationDetected && !instance.savedChangeLogs) {
-                instance.savedChangeLogs = changeLogs.join('\n\n');
-                instance.lastPrice = currentPrice;
-                instance.lastOffers = combinedOffersText;
-                instance.lastOffersRaw = currentOffersRaw;
-            }
+        if (isFluctuationDetected) {
+            instance.savedChangeLogs = changeLogs.join('\n\n');
             
-            instance.alertFired = true; 
-            let priceDisplay = currentPrice !== "N/A" ? `₹${currentPrice}` : "N/A";
+            if (currentPrice !== "N/A" && currentPrice !== "") {
+                instance.lastPrice = currentPrice;
+            }
+            instance.lastOffers = combinedOffersText;
+            instance.lastOffersRaw = currentOffersRaw;
+            
+            let priceDisplay = instance.lastPrice ? `₹${instance.lastPrice}` : "N/A";
             let displayLogs = instance.savedChangeLogs || `⚠️ *System Alert:* Fluctuations observed!`;
 
             await bot.telegram.sendMessage(chatId, 
@@ -469,5 +475,4 @@ bot.launch({
     polling: {
         dropPendingUpdates: true 
     }
-}).then(() => console.log("Spy Control Pro Fully Running Fixed V3..."));
-        
+}).then(() => console.log("Spy Control Pro Engine Pure Live..."));
