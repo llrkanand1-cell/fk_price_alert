@@ -7,7 +7,7 @@ const path = require('path');
 // --- CONFIGURATION ---
 const BOT_TOKEN = '8980239383:AAFwZVEzP0lTYoIG3-HYig4xTz47L1n0lXY'; 
 const ADMIN_CHAT_ID = '7485181331'; 
-const CHECK_INTERVAL = 15000; 
+const CHECK_INTERVAL = 30000; // 30 second loop
 const RENDER_URL = 'https://fk-financial-tracker.onrender.com'; // Locked Live URL
 const DB_FILE = path.join(__dirname, 'database.json');
 // ---------------------
@@ -52,12 +52,10 @@ const PORT = process.env.PORT || 10000;
 app.get('/', (req, res) => res.status(200).send('Financial Core Engine Fixed Live!'));
 app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Port Binding Successful on ${PORT}`));
 
-// 🔥🔥🔥 SILENT 30-SECOND NON-STOP JHATKA SYSTEM (NO LOGS IN DASHBOARD) 🔥🔥🔥
-// Yeh loop chupchaap server ko ping karega bina logs me kachra failaye
+// 🔥 SILENT 30-SECOND NON-STOP JHATKA SYSTEM (NO LOGS)
 setInterval(() => {
     axios.get(RENDER_URL).catch(() => {}); 
 }, 30000); 
-// ---------------------------------------------------------------------
 
 // --- CALLBACK BUTTONS HANDLER ---
 bot.on('callback_query', async (ctx) => {
@@ -72,7 +70,7 @@ bot.on('callback_query', async (ctx) => {
             clearInterval(removedItem.interval);
             activeUsers[chatId].splice(index, 1);
             await ctx.answerCbQuery("Tracking band kar di gayi hai! 🛑").catch(() => {});
-            return ctx.reply(`🛑 Stopped tracking for:\n${removedItem.url}`, { disable_web_page_preview: true });
+            return ctx.reply(`🛑 Ok boss, tracking band kar di is link ki:\n${removedItem.url}`, { disable_web_page_preview: true });
         }
         return ctx.answerCbQuery("⚠️ Already stopped.").catch(() => {});
     }
@@ -114,7 +112,7 @@ bot.command('track_bank', async (ctx) => { setupTrackingEngine(ctx, 'bankonly', 
 
 function setupTrackingEngine(ctx, mode, modeLabel) {
     const userId = ctx.from.id.toString();
-    if (!isUserApproved(userId)) return ctx.reply("❌ Access Denied!");
+    if (!isUserApproved(userId)) return; 
     
     const chatId = ctx.chat.id.toString();
     const args = ctx.message.text.replace(/\n/g, ' ').split(' ').filter(arg => arg.trim() !== '');
@@ -135,7 +133,7 @@ function setupTrackingEngine(ctx, mode, modeLabel) {
     if (!pid) pid = Buffer.from(fkLink).toString('base64').substring(0, 10);
 
     if (!activeUsers[chatId]) activeUsers[chatId] = [];
-    if (activeUsers[chatId].some(item => item.id === pid)) return ctx.reply("⚠️ Yeh product pe ... se hi track ho raha hai!");
+    if (activeUsers[chatId].some(item => item.id === pid)) return ctx.reply("⚠️ Abe ye product toh pehle se hi dauda rakha hai list me!");
 
     const intervalId = setInterval(() => { checkFinancialFluctuations(ctx, chatId, pid, fkLink, mode); }, CHECK_INTERVAL);
 
@@ -150,15 +148,17 @@ function setupTrackingEngine(ctx, mode, modeLabel) {
         lastOffersRaw: []
     });
 
-    ctx.reply(`🚀 **Detailed Monitoring Active!**\n⚙️ Mode: \`[${modeLabel}]\` \nHar 15 second me accurate comparison chalu...`);
+    // 🔥 FUNNY CONFIRMATION MESSAGE (Sirf ek baar link daalne pr aayega, fir background me chupchap chalega)
+    ctx.reply(`🎯 **Link Lock Ho Gya Bhai!**\n\n☕ Chal ab tu aaram se jaake **chai-wai piyo ya mast apni neend poori karo**, cheetah jaisi nazar laga di hai tere bhai ne. Jaise hi thoda sa bhi fluctuation hoga, tera bhai tere kaan ke neeche **alert baja baja kar** tujhe jaga dega! 😎🚀`);
+
     checkFinancialFluctuations(ctx, chatId, pid, fkLink, mode);
 }
 
 bot.command('list_track', (ctx) => {
     const userId = ctx.from.id.toString();
-    if (!isUserApproved(userId)) return ctx.reply("❌ Access Denied!");
+    if (!isUserApproved(userId)) return;
     const chatId = ctx.chat.id.toString();
-    if (!activeUsers[chatId] || activeUsers[chatId].length === 0) return ctx.reply("😴 Koyi active links nahi hain.");
+    if (!activeUsers[chatId] || activeUsers[chatId].length === 0) return ctx.reply("😴 Abhi koi link nahi chal raha, sab shant hai.");
     
     let msg = "📋 **Aapki Running Tracking Matrix:**\n\n";
     activeUsers[chatId].forEach((item, index) => {
@@ -169,13 +169,13 @@ bot.command('list_track', (ctx) => {
 
 bot.command('stop_all', (ctx) => {
     const userId = ctx.from.id.toString();
-    if (!isUserApproved(userId)) return ctx.reply("❌ Access Denied!");
+    if (!isUserApproved(userId)) return;
     const chatId = ctx.chat.id.toString();
     if (activeUsers[chatId] && activeUsers[chatId].length > 0) {
         activeUsers[chatId].forEach(item => clearInterval(item.interval));
         delete activeUsers[chatId];
-        ctx.reply("🛑 Saari tracking band kar di gayi.");
-    } else { ctx.reply("⚠️ Koyi active tracking nahi mili."); }
+        ctx.reply("🛑 Saari active tracking ek jhatke me saaf kar di!");
+    } else { ctx.reply("⚠️ Koyi active tracking chal hi nahi rahi."); }
 });
 
 // Admin commands
@@ -226,7 +226,7 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
             },
-            timeout: 8000
+            timeout: 12000 
         });
 
         const html = response.data;
@@ -326,4 +326,4 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
     } catch (err) {}
 }
 
-bot.launch().then(() => console.log("Silent 24/7 Engine Connected..."));
+bot.launch().then(() => console.log("Silent 30s Loop Engine Connected..."));
