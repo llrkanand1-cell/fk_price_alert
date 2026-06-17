@@ -55,6 +55,7 @@ function isUserApproved(userId) {
 const app = express();
 const PORT = process.env.PORT || 10000;
 
+// Webhook for Render stability
 app.use(bot.webhookCallback('/secret-telegram-webhook'));
 
 app.get('/', (req, res) => res.status(200).send('Financial Core Engine Webhook Live!'));
@@ -81,34 +82,6 @@ const getProKeyboard = () => {
         ['📋 List Active', '🛑 Stop All Operations']
     ]).resize();
 };
-
-// 🔥 FIXED CALLBACK QUERY ENGINE FOR INLINE STOP BUTTONS
-bot.on('callback_query', async (ctx) => {
-    const data = ctx.callbackQuery.data;
-    const chatId = ctx.chat.id.toString();
-    
-    if (data.startsWith('stop_fk_')) {
-        const index = parseInt(data.split('_')[2]);
-        
-        if (activeUsers[chatId] && activeUsers[chatId][index]) {
-            const removedItem = activeUsers[chatId][index];
-            
-            // Interval clear karke memory se hataezo
-            clearInterval(removedItem.interval);
-            activeUsers[chatId].splice(index, 1);
-            
-            // Dynamic UI response update
-            await ctx.answerCbQuery(`Target [${index + 1}] Stopped! 🛑`).catch(() => {});
-            await ctx.editMessageText(`🛑 <b>Target [${index + 1}] radar se permanent saaf kar diya gaya hai!</b>\n\nAb is link ki tracking band ho chuki hai bhai.`, { parse_mode: 'HTML' }).catch(() => {});
-            return;
-        } else {
-            await ctx.answerCbQuery("⚠️ Target pehle se hi band hai ya delete ho chuka hai.").catch(() => {});
-            await ctx.editMessageText(`⚠️ <i>Yeh target pehle se hi saaf kiya ja chuka hai boss!</i>`, { parse_mode: 'HTML' }).catch(() => {});
-            return;
-        }
-    }
-    await ctx.answerCbQuery().catch(() => {});
-});
 
 bot.start((ctx) => {
     const userId = ctx.from.id.toString();
@@ -137,16 +110,41 @@ bot.hears('🛵 Track Bank', (ctx) => {
 bot.hears('📋 List Active', (ctx) => { displayActiveTracks(ctx); });
 bot.hears('🛑 Stop All Operations', (ctx) => { killAllOperations(ctx); });
 
-bot.on('text', async (ctx) => {
+// 🔥 HIGH-PRECISION TEXT TEXT COMMAND INTERCEPTOR FOR /stop1, /stop2, etc.
+bot.on('text', async (ctx, next) => {
     const userId = ctx.from.id.toString();
     if (!isUserApproved(userId)) return;
-    const textInput = ctx.message.text.trim();
-    if (['🚀 Track Both', '🛵 Track Bank', '📋 List Active', '🛑 Stop All Operations'].includes(textInput)) return;
+
+    const textInput = ctx.message.text.trim().toLowerCase();
+
+    // Agar text "/stop" se shuru ho raha hai (jaise /stop1, /stop2)
+    if (textInput.startsWith('/stop') && textInput !== '/stop_all') {
+        const chatId = ctx.chat.id.toString();
+        
+        // Piche ka number nikalne ke liye
+        const numStr = textInput.replace('/stop', '').trim();
+        const index = parseInt(numStr) - 1; // Array 0 se shuru hota hai
+
+        if (isNaN(index) || !activeUsers[chatId] || !activeUsers[chatId][index]) {
+            return ctx.reply("⚠️ **Galat Target Number!** Pehle `📋 List Active` check karo boss.");
+        }
+
+        const removedItem = activeUsers[chatId][index];
+        
+        // Loop clear karo aur array se delete karo
+        clearInterval(removedItem.interval);
+        activeUsers[chatId].splice(index, 1);
+
+        return ctx.reply(`🛑 <b>Target [${index + 1}] radar se permanent saaf!</b>\nTracking successfully stopped for:\n<code>${removedItem.url}</code>`, { parse_mode: 'HTML', disable_web_page_preview: true });
+    }
+
+    // Baaki normal flow chalne do
+    if (['🚀 track both', '🛵 track bank', '📋 list active', '🛑 stop all operations'].includes(textInput)) return;
 
     if (userSessions[userId]) {
         const mode = userSessions[userId];
         const modeLabel = mode === 'both' ? 'Price + Deep Bank Offers' : 'Only Deep Bank Offers';
-        const args = textInput.replace(/\n/g, ' ').split(' ').filter(arg => arg.trim() !== '');
+        const args = ctx.message.text.replace(/\n/g, ' ').split(' ').filter(arg => arg.trim() !== '');
         let fkLink = args.find(arg => arg.includes('flipkart.com') || arg.includes('fkrt.it'));
 
         if (!fkLink) return ctx.reply(`❌ Valid Flipkart link bhejo bhai!`, getProKeyboard());
@@ -170,16 +168,17 @@ function setupCoreScraperSystem(ctx, fkLink, mode, modeLabel) {
     checkFinancialFluctuations(ctx, chatId, pid, fkLink, mode);
 }
 
+// 🔥 FIXED UI: Ab har active link ke sath uski direct /stop command dikhegi
 function displayActiveTracks(ctx) {
     const chatId = ctx.chat.id.toString();
     if (!activeUsers[chatId] || activeUsers[chatId].length === 0) return ctx.reply("😴 Koyi active target radar par nahi hai.");
-    let msg = "📋 <b>Active Targets Matrix:</b>\n\n";
-    let keyboardButtons = [];
+    
+    let msg = "📋 <b>Radar Par Active Targets Matrix:</b>\n\n";
     activeUsers[chatId].forEach((item, index) => {
-        msg += `🔢 <b>Target [${index + 1}]</b>\n⚙️ <b>Mode:</b> <code>[${item.mode}]</code>\n🔗 <b>Link:</b> ${item.url}\n\n`;
-        keyboardButtons.push([Markup.button.callback(`Stop ${index + 1} 🛑`, `stop_fk_${index}`)]);
+        msg += `🔢 <b>Target [${index + 1}]</b>\n⚙️ <b>Mode:</b> <code>[${item.mode}]</code>\n🔗 <b>Link:</b> ${item.url}\n🛑 <b>Stop Command:</b> /stop${index + 1}\n\n`;
     });
-    ctx.reply(msg, { parse_mode: 'HTML', disable_web_page_preview: true, ...Markup.inlineKeyboard(keyboardButtons) });
+    
+    ctx.reply(msg, { parse_mode: 'HTML', disable_web_page_preview: true });
 }
 
 function killAllOperations(ctx) {
@@ -231,8 +230,8 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
             instance.lastOffers = combinedOffersText;
 
             await bot.telegram.sendMessage(chatId, 
-                `🔥 <b>Oo bhaiiii badal gya hai snapshot!</b> 🔥\n\n💰 Price: <b>₹${currentPrice}</b>\n🏛️ Bank Offers:\n${combinedOffersText}\nLink:\n${originalUrl}`,
-                { parse_mode: 'HTML', ...Markup.inlineKeyboard([[Markup.button.callback('Stop Tracking 🛑', `stop_fk_${itemIndex}`)]]) }
+                `🔥 <b>Oo bhaiiii badal gya hai snapshot!</b> 🔥\n\n💰 Price: <b>₹${currentPrice}</b>\n🏛️ Bank Offers:\n${combinedOffersText}\nLink:\n${originalUrl}\n\n🛑 Stop instant: /stop${itemIndex + 1}`,
+                { parse_mode: 'HTML' }
             ).catch(() => {});
         }
     } catch (err) {}
