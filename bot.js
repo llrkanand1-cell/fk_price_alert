@@ -119,7 +119,7 @@ bot.start((ctx) => {
     }).catch(() => {});
 });
 
-// --- 🔥 ADMIN COMMANDS SECTION (PLACED BEFORE TEXT INTERCEPTOR) ---
+// --- 🔥 HIGH-PRIORITY COMMANDS SECTION (ORDER FIXED!) ---
 
 bot.command('approve', (ctx) => {
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
@@ -148,12 +148,10 @@ bot.command('list_users', (ctx) => {
     ctx.reply(msg, { parse_mode: 'Markdown' });
 });
 
-// --- 🔥 GUARANTEED FIXED REMOVE USER COMMAND ---
 bot.command('remove_user', async (ctx) => {
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
         return ctx.reply("❌ **Warning! Identity Verification Failed.**\nAbe shaane, yeh command sirf asli Loot Master (Admin) ke fingerprint par khulti hai. Chal peeche hatt! 👮‍♂️🔥");
     }
-
     const args = ctx.message.text.split(' ').filter(arg => arg.trim() !== '');
     if (args.length < 2) return ctx.reply("⚠️ Format: `/remove_user <user_id>`");
     
@@ -162,11 +160,9 @@ bot.command('remove_user', async (ctx) => {
     const idx = currentList.indexOf(targetUserId);
     
     if (idx !== -1) {
-        // 1. JSON Database se saaf karo
         currentList.splice(idx, 1);
         saveApprovedUsers(currentList);
         
-        // 2. RAM Memory Cleanup - Dhat teri ki, saare active scrapers roko!
         const idFormatsToClear = [targetUserId, targetUserId.toString()];
         idFormatsToClear.forEach(id => {
             if (activeUsers[id] && activeUsers[id].length > 0) {
@@ -178,24 +174,25 @@ bot.command('remove_user', async (ctx) => {
         });
         if (userSessions[targetUserId]) delete userSessions[targetUserId];
 
-        // 3. ✅ ADMIN KO CONFIRMATION REPLY (Ab 100% chalega!)
-        await ctx.reply(`✅ **Operation Successful!**\n\nAgent \`${targetUserId}\` ka access permanent cancel kar diya gaya hai aur uski saari tracking band ho chuki hai! ⚡💥`, { parse_mode: 'Markdown' });
+        ctx.reply(`✅ **Operation Successful!**\n\nAgent \`${targetUserId}\` ka access permanent cancel kar diya gaya hai! ⚡💥`, { parse_mode: 'Markdown' });
         
-        // 4. Target User Notification (Wrapped in try/catch taaki bot block hone par bot crash na ho)
         bot.telegram.sendMessage(
             targetUserId, 
             "⚠️ **bhai admin ne tera access hata diya hai** 🚫\n\nAb aap is bot ke khufiya features aur control panel use nahi kar sakte.",
             Markup.removeKeyboard() 
-        ).catch((e) => {
-            console.log("User has blocked the bot, notification skipped smoothly.");
-        });
-        
+        ).catch(() => {});
     } else {
-        ctx.reply("⚠️ Yeh ID approved agents ki list mein nahi mili boss!");
+        ctx.reply("⚠️ Yeh ID approved agents ki list mein nahi mili.");
     }
 });
 
-// --- USER CONTROL PANEL HEARS ---
+// TRACKING COMMANDS LINKS
+bot.command('track_both', async (ctx) => { handleLegacyCommands(ctx, 'both', 'Price + Deep Bank Offers'); });
+bot.command('track_bank', async (ctx) => { handleLegacyCommands(ctx, 'bankonly', 'Only Deep Bank Offers'); });
+bot.command('list_track', (ctx) => { displayActiveTracks(ctx); });
+bot.command('stop_all', (ctx) => { killAllOperations(ctx); });
+
+// PANEL HEARS REGISTERED SAFELY
 bot.hears('🚀 Track Both', (ctx) => {
     const userId = ctx.from.id.toString();
     if (!isUserApproved(userId)) return;
@@ -210,28 +207,37 @@ bot.hears('🛵 Track Bank', (ctx) => {
     ctx.reply("🕵️‍♂️ **Agent Only-Bank Engine Ready!**\n\nAb seedha Flipkart ka **link paste karke send kar do** bhai!");
 });
 
-bot.command('track_both', async (ctx) => { handleLegacyCommands(ctx, 'both', 'Price + Deep Bank Offers'); });
-bot.command('track_bank', async (ctx) => { handleLegacyCommands(ctx, 'bankonly', 'Only Deep Bank Offers'); });
-
-bot.command('list_track', (ctx) => { displayActiveTracks(ctx); });
 bot.hears('📋 List Active', (ctx) => { displayActiveTracks(ctx); });
-
-bot.command('stop_all', (ctx) => { killAllOperations(ctx); });
 bot.hears('🛑 Stop All Operations', (ctx) => { killAllOperations(ctx); });
 
 
-// --- SMART INCOMING MESSAGE INTERCEPTOR ---
+// --- 🧠 SMART TEXT INTERCEPTOR ENGINE ---
 bot.on('text', async (ctx) => {
     const userId = ctx.from.id.toString();
+    const chatId = ctx.chat.id.toString();
     if (!isUserApproved(userId)) return;
 
     const textInput = ctx.message.text.trim();
 
-    // Ignore panel buttons strings
+    // 1. Agar user ne command ya panel button dabaya ho toh interceptor ignore karega
     if (['🚀 Track Both', '🛵 Track Bank', '📋 List Active', '🛑 Stop All Operations'].includes(textInput)) return;
-    // Ignore any commands starting with / so they don't get trapped here
     if (textInput.startsWith('/')) return;
 
+    // 2. 🔥 SMART SHORTCUT: stop 1, stop 2, stop 3 logic handles here
+    const stopMatch = textInput.match(/^stop\s+(\d+)$/i);
+    if (stopMatch) {
+        const targetIndex = parseInt(stopMatch[1]) - 1; // Array Index 0 se start hota hai
+        if (activeUsers[chatId] && activeUsers[chatId][targetIndex]) {
+            const removedItem = activeUsers[chatId][targetIndex];
+            clearInterval(removedItem.interval); // Loop band karo
+            activeUsers[chatId].splice(targetIndex, 1); // Matrix se udao
+            return ctx.reply(`🛑 Ok boss, tracking band kar di item number **${targetIndex + 1}** ki:\n${removedItem.url}`, { parse_mode: 'Markdown', disable_web_page_preview: true });
+        } else {
+            return ctx.reply(`⚠️ Bhai, is number (**${targetIndex + 1}**) par koi active target radar par nahi mila. \`📋 List Active\` check karo.`);
+        }
+    }
+
+    // 3. Normal URL Tracker interceptor block
     if (userSessions[userId]) {
         const mode = userSessions[userId];
         const modeLabel = mode === 'both' ? 'Price + Deep Bank Offers' : 'Only Deep Bank Offers';
@@ -240,7 +246,7 @@ bot.on('text', async (ctx) => {
         let fkLink = args.find(arg => arg.includes('flipkart.com/'));
 
         if (!fkLink) {
-            return ctx.reply(`❌ **Abe saaf link bhejo Agent!**\nInput mein Flipkart ka link nahi mila. Dobara sahi se link bhejo ya pehle command select karo!`, getProKeyboard());
+            return ctx.reply(`❌ **Abe saaf link bhejo Agent!**\nInput mein Flipkart ka link nahi mila. Dobara sahi se link bhejo!`, getProKeyboard());
         }
 
         setupCoreScraperSystem(ctx, fkLink, mode, modeLabel);
@@ -305,7 +311,7 @@ function displayActiveTracks(ctx) {
     
     let msg = "📋 **Radar Par Locked Targets Matrix:**\n\n";
     activeUsers[chatId].forEach((item, index) => {
-        msg += `${index + 1}. 📦 **ID:** \`${item.id}\` \n⚙️ **Mode:** \`[${item.mode}]\` \n🔗 **Link:** ${item.url}\n\n`;
+        msg += `*${index + 1}.* 📦 **ID:** \`${item.id}\` \n⚙️ **Mode:** \`[${item.mode}]\` \n🔗 **Link:** ${item.url}\n👉 *Band karne ke liye likhein:* \`stop ${index + 1}\` \n\n`;
     });
     ctx.reply(msg, { parse_mode: 'Markdown', disable_web_page_preview: true });
 }
@@ -438,4 +444,4 @@ bot.launch({
     polling: {
         dropPendingUpdates: true 
     }
-}).then(() => console.log("Spy Control Pro Clean Setup Live..."));
+}).then(() => console.log("Spy Control Pro Engine Fully Operational..."));
