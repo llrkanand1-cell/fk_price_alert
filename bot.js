@@ -7,20 +7,21 @@ const path = require('path');
 // --- CONFIGURATION ---
 const BOT_TOKEN = '8980239383:AAFwZVEzP0lTYoIG3-HYig4xTz47L1n0lXY'; 
 const ADMIN_CHAT_ID = '7485181331'; 
-const CHECK_INTERVAL = 30000; // 30 second precision loop
+const CHECK_INTERVAL = 30000; // 30 second loop
 const RENDER_URL = 'https://fk-financial-tracker.onrender.com'; // Locked Live URL
 const DB_FILE = path.join(__dirname, 'database.json');
 // ---------------------
 
 const bot = new Telegraf(BOT_TOKEN);
 const activeUsers = {};
+const userSessions = {}; // 🔥 Will handle user tracking state silently
 
-// 🔥 PERMANENT KEYBOARD PANEL SETUP (Bina type kiye ek click me kaam)
+// Permanent Panel Buttons Layout
 const getProKeyboard = () => {
     return Markup.keyboard([
         ['🚀 Track Both', '🛵 Track Bank'],
         ['📋 List Active', '🛑 Stop All Operations']
-    ]).resize(); // resize() se buttons phone screen ke hisab se perfectly fit ho jate hain
+    ]).resize();
 };
 
 // --- 📂 PERMANENT FILE DATABASE LOGIC ---
@@ -93,8 +94,6 @@ bot.on('callback_query', async (ctx) => {
             saveApprovedUsers(currentList);
         }
         await ctx.editMessageText(`${ctx.callbackQuery.message.text}\n\n✅ **Mission Status: Agent Activated Permanently!**`).catch(() => {});
-        
-        // 🔥 FIXED: Approve hote hi user ko permanent buttons panel gift mil jayega
         await bot.telegram.sendMessage(targetUserId, "🎉 **Mubarak ho! Admin ne aapka secret access approve kar diya hai! Neeche diye gaye control panel se operation chalu karo.**", getProKeyboard()).catch(() => {});
     } else if (data.startsWith('decline_')) {
         await ctx.editMessageText(`${ctx.callbackQuery.message.text}\n\n❌ **Mission Status: Access Request Burnt!**`).catch(() => {});
@@ -102,12 +101,13 @@ bot.on('callback_query', async (ctx) => {
     await ctx.answerCbQuery().catch(() => {});
 });
 
-// --- COMMANDS & KEYBOARD PANEL TEXT HANDLERS ---
+// --- COMMANDS MATRIX ---
 bot.start((ctx) => {
     const userId = ctx.from.id.toString();
     const name = `${ctx.from.first_name || ''}`.trim();
     
     if (isUserApproved(userId)) {
+        delete userSessions[userId]; // Reset state
         return ctx.reply(`🤖 *Welcome Agent ${name}!* Secret Control Panel Activated!\n\nNeeche diye gaye buttons par click karke direct use karo boss, ab kuch type karne ka jhanjhat nahi! 😎`, getProKeyboard());
     }
     
@@ -119,12 +119,23 @@ bot.start((ctx) => {
     }).catch(() => {});
 });
 
-// Dono commands text aur buttons dono ko support karengi
-bot.command('track_both', async (ctx) => { triggerTrackSetup(ctx, 'both', 'Price + Deep Bank Offers'); });
-bot.hears('🚀 Track Both', async (ctx) => { triggerTrackSetup(ctx, 'both', 'Price + Deep Bank Offers'); });
+// --- 🔥 KEYBOARD BUTTON TRIGGERS WITH SMART SESSION STATE ---
+bot.hears('🚀 Track Both', (ctx) => {
+    const userId = ctx.from.id.toString();
+    if (!isUserApproved(userId)) return;
+    userSessions[userId] = 'both'; // Lock session for both tracking
+    ctx.reply("🕵️‍♂️ **Agent Price + Bank Engine Ready!**\n\nAb seedha Flipkart ka **link paste karke send kar do** bhai, koi command likhne ki zaroorat nahi hai!");
+});
 
-bot.command('track_bank', async (ctx) => { triggerTrackSetup(ctx, 'bankonly', 'Only Deep Bank Offers'); });
-bot.hears('🛵 Track Bank', async (ctx) => { triggerTrackSetup(ctx, 'bankonly', 'Only Deep Bank Offers'); });
+bot.hears('🛵 Track Bank', (ctx) => {
+    const userId = ctx.from.id.toString();
+    if (!isUserApproved(userId)) return;
+    userSessions[userId] = 'bankonly'; // Lock session for bank tracking
+    ctx.reply("🕵️‍♂️ **Agent Only-Bank Engine Ready!**\n\nAb seedha Flipkart ka **link paste karke send kar do** bhai, koi command likhne ki zaroorat nahi hai!");
+});
+
+bot.command('track_both', async (ctx) => { handleLegacyCommands(ctx, 'both', 'Price + Deep Bank Offers'); });
+bot.command('track_bank', async (ctx) => { handleLegacyCommands(ctx, 'bankonly', 'Only Deep Bank Offers'); });
 
 bot.command('list_track', (ctx) => { displayActiveTracks(ctx); });
 bot.hears('📋 List Active', (ctx) => { displayActiveTracks(ctx); });
@@ -133,24 +144,51 @@ bot.command('stop_all', (ctx) => { killAllOperations(ctx); });
 bot.hears('🛑 Stop All Operations', (ctx) => { killAllOperations(ctx); });
 
 
-// Helper core functions
-function triggerTrackSetup(ctx, mode, modeLabel) {
+// --- 🔥 SMART INCOMING MESSAGE INTERCEPTOR (TEXT ROUTER) ---
+bot.on('text', async (ctx) => {
     const userId = ctx.from.id.toString();
     if (!isUserApproved(userId)) return;
-    
-    // Agar direct button dabaya hai toh instruction denge
-    if (ctx.message.text === '🚀 Track Both') {
-        return ctx.reply("💡 **Track Both Chalu Karne Ka Tareeka:**\nType karein: `/track_both <Flipkart_URL>`");
-    }
-    if (ctx.message.text === '🛵 Track Bank') {
-        return ctx.reply("💡 **Track Bank Chalu Karne Ka Tareeka:**\nType karein: `/track_bank <Flipkart_URL>`");
-    }
 
-    const chatId = ctx.chat.id.toString();
+    const textInput = ctx.message.text.trim();
+
+    // Ignore text inputs that match standard keyboard command texts
+    if (['🚀 Track Both', '🛵 Track Bank', '📋 List Active', '🛑 Stop All Operations'].includes(textInput)) return;
+
+    // Check if user is inside a state session
+    if (userSessions[userId]) {
+        const mode = userSessions[userId];
+        const modeLabel = mode === 'both' ? 'Price + Deep Bank Offers' : 'Only Deep Bank Offers';
+        
+        // Extract link directly from plain text input
+        const args = textInput.replace(/\n/g, ' ').split(' ').filter(arg => arg.trim() !== '');
+        let fkLink = args.find(arg => arg.includes('flipkart.com/'));
+
+        if (!fkLink) {
+            return ctx.reply(`❌ **Abe saaf link bhejo Agent!**\nInput mein Flipkart ka link nahi mila. Dobara sahi se link bhejo ya pehle command select karo!`, getProKeyboard());
+        }
+
+        // Successfully found link, route to actual core tracking processor
+        setupCoreScraperSystem(ctx, fkLink, mode, modeLabel);
+        delete userSessions[userId]; // Session clear after success lock
+    } else {
+        // Regular plain text text with no active button session
+        if (textInput.includes('flipkart.com/')) {
+            ctx.reply(`💡 **Bhai pehle select toh karo kya track karna hai!**\nNeeche panel se \`🚀 Track Both\` ya \`🛵 Track Bank\` select karo, fir link bhejo!`, getProKeyboard());
+        }
+    }
+});
+
+
+// Helper execution engine blocks
+function handleLegacyCommands(ctx, mode, modeLabel) {
     const args = ctx.message.text.replace(/\n/g, ' ').split(' ').filter(arg => arg.trim() !== '');
     let fkLink = args.find(arg => arg.includes('flipkart.com/'));
-    
-    if (!fkLink) return ctx.reply(`🕵️‍♂️ **Abe shaane agent, bandook le aaya par goli (link) kahan hai?**\nCommand ke aage space dekar Flipkart ka link toh chipka pehle! 🤐`, { parse_mode: 'Markdown' });
+    if (!fkLink) return ctx.reply(`❌ Format Error! Commands ke sath space dekar link bhejein.`);
+    setupCoreScraperSystem(ctx, fkLink, mode, modeLabel);
+}
+
+function setupCoreScraperSystem(ctx, fkLink, mode, modeLabel) {
+    const chatId = ctx.chat.id.toString();
     
     let pid = "";
     try {
@@ -368,4 +406,4 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
     } catch (err) {}
 }
 
-bot.launch().then(() => console.log("Spy Control Pro Keyboard Layout Live..."));
+bot.launch().then(() => console.log("Spy Control Pro State Layout Live..."));
