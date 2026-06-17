@@ -5,10 +5,10 @@ const fs = require('fs');
 const path = require('path');
 
 // --- CONFIGURATION ---
-const BOT_TOKEN = '8980239383:AAFwZVEzP0lTYoIG3-HYig4xTz47L1n0lXY'; // Verified Fresh Token
-const ADMIN_CHAT_ID = '7485181331'; // Admin Chat ID Fixed
-const CHECK_INTERVAL = 15000; // Har 15 second me strictly scanning loop
-const RENDER_URL = 'https://fk-financial-tracker.onrender.com'; // 🔥 AAPKA LIVE LINK LOCKED!
+const BOT_TOKEN = '8980239383:AAFwZVEzP0lTYoIG3-HYig4xTz47L1n0lXY'; 
+const ADMIN_CHAT_ID = '7485181331'; 
+const CHECK_INTERVAL = 15000; // Har 15 second me accurate scan
+const RENDER_URL = 'https://fk-financial-tracker.onrender.com'; // Locked Live URL
 const DB_FILE = path.join(__dirname, 'database.json');
 // ---------------------
 
@@ -49,11 +49,10 @@ function isUserApproved(userId) {
 
 const app = express();
 const PORT = process.env.PORT || 10000;
-app.get('/', (req, res) => res.status(200).send('Financial Command Engine Live 24/7!'));
+app.get('/', (req, res) => res.status(200).send('Financial Number Core Engine Live!'));
 app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Port Binding Successful on ${PORT}`));
 
-// 🔥🔥🔥 30-SECOND NON-STOP JHATKA SYSTEM (ANTI-SLEEP LOOP) 🔥🔥🔥
-// Yeh loop aapke exact link pr hit marega taaki server 24 ghante solid chalta rahe
+// 🔥 30-SECOND NON-STOP JHATKA SYSTEM
 setInterval(() => {
     console.log("⚡ [Jhatka System] Sending self-ping to keep server hot and alive 24/7...");
     axios.get(RENDER_URL)
@@ -61,7 +60,7 @@ setInterval(() => {
         .catch(() => console.log("⚠️ [Jhatka System] Self-ping heartbeat recorded.")); 
 }, 30000); 
 
-// --- CALLBACK BUTTONS HANDLER (STOP TRACKING BUTTON) ---
+// --- CALLBACK BUTTONS HANDLER ---
 bot.on('callback_query', async (ctx) => {
     const data = ctx.callbackQuery.data;
     const chatId = ctx.chat.id.toString();
@@ -79,7 +78,6 @@ bot.on('callback_query', async (ctx) => {
         return ctx.answerCbQuery("⚠️ Already stopped.").catch(() => {});
     }
 
-    // Admin inline validation
     if (clickerId !== ADMIN_CHAT_ID.toString()) {
         return ctx.answerCbQuery("❌ Unauthorized!").catch(() => {});
     }
@@ -92,7 +90,7 @@ bot.on('callback_query', async (ctx) => {
             saveApprovedUsers(currentList);
         }
         await ctx.editMessageText(`${ctx.callbackQuery.message.text}\n\n✅ **Status: Approved Permanently!**`).catch(() => {});
-        await bot.telegram.sendMessage(targetUserId, "🎉 **Mubarak ho! Admin ne aapka access approve kar diya hai!**\n\n👉 Track karne ke liye ye commands use karein:\n💰 Price + Bank: \`/track_both <URL>\`\n💳 Only Bank: \`/track_bank <URL>\`", { parse_mode: 'Markdown' }).catch(() => {});
+        await bot.telegram.sendMessage(targetUserId, "🎉 **Mubarak ho! Admin ne aapka access approve kar diya hai!**\n\n👉 Commands:\n💰 Price + Bank: \`/track_both <URL>\`\n💳 Only Bank: \`/track_bank <URL>\`", { parse_mode: 'Markdown' }).catch(() => {});
     } else if (data.startsWith('decline_')) {
         await ctx.editMessageText(`${ctx.callbackQuery.message.text}\n\n❌ **Status: Declined!**`).catch(() => {});
     }
@@ -105,24 +103,17 @@ bot.start((ctx) => {
     const name = `${ctx.from.first_name || ''}`.trim();
     
     if (isUserApproved(userId)) {
-        return ctx.reply(`🤖 *Welcome ${name}!* Financial Command Engine Active 24/7!\n\n🔹 **Tracking Commands:**\n🚀 \`/track_both <Flipkart_URL>\` — Price + Bank Offer Alert\n🛵 \`/track_bank <Flipkart_URL>\` — Only Bank Offer Alert\n📋 \`/list_track\` — Chal rahi tracking check karein\n🛑 \`/stop_all\` — Saari tracking instantly band karein\n\n👑 **Admin Commands:**\n📋 \`/list_users\` — Approved users list\n❌ \`/remove_user <ID>\` — Remove user access`, { parse_mode: 'Markdown' });
+        return ctx.reply(`🤖 *Welcome ${name}!* Advanced Financial Tracker Live 24/7!\n\n🔹 **Commands:**\n🚀 \`/track_both <Flipkart_URL>\` — Price + Deep Bank Offers (Numbers & % Monitor)\n🛵 \`/track_bank <Flipkart_URL>\` — Only Deep Bank Offers Alert\n📋 \`/list_track\` — Active tracking matrix\n🛑 \`/stop_all\` — Band karein saari tracking`, { parse_mode: 'Markdown' });
     }
     
-    ctx.reply(`🔒 **Access Denied!** Aapki ID: \`${userId}\` \nAdmin ke paas request bhej di gayi hai.`);
+    ctx.reply(`🔒 **Access Denied!** ID: \`${userId}\` \nAdmin ke paas request bhej di gayi hai.`);
     bot.telegram.sendMessage(ADMIN_CHAT_ID, `🚨 **New Request Alert!**\nName: ${name}\nID: \`${userId}\``, {
         ...Markup.inlineKeyboard([[Markup.button.callback('Approve ✅', `approve_${userId}`), Markup.button.callback('Decline ❌', `decline_${userId}`)]])
     }).catch(() => {});
 });
 
-// --- COMMAND 1: TRACK BOTH (PRICE + BANK OFFER) ---
-bot.command('track_both', async (ctx) => {
-    setupTrackingEngine(ctx, 'both', 'Price + Bank Offer');
-});
-
-// --- COMMAND 2: TRACK BANK (ONLY BANK OFFER ALERT) ---
-bot.command('track_bank', async (ctx) => {
-    setupTrackingEngine(ctx, 'bankonly', 'Only Bank Offer');
-});
+bot.command('track_both', async (ctx) => { setupTrackingEngine(ctx, 'both', 'Price + Deep Bank Offers'); });
+bot.command('track_bank', async (ctx) => { setupTrackingEngine(ctx, 'bankonly', 'Only Deep Bank Offers'); });
 
 function setupTrackingEngine(ctx, mode, modeLabel) {
     const userId = ctx.from.id.toString();
@@ -151,9 +142,7 @@ function setupTrackingEngine(ctx, mode, modeLabel) {
         return ctx.reply("⚠️ Yeh product pehle se hi track ho raha hai!");
     }
 
-    const intervalId = setInterval(() => { 
-        checkFinancialFluctuations(ctx, chatId, pid, fkLink, mode); 
-    }, CHECK_INTERVAL);
+    const intervalId = setInterval(() => { checkFinancialFluctuations(ctx, chatId, pid, fkLink, mode); }, CHECK_INTERVAL);
 
     activeUsers[chatId].push({
         id: pid,
@@ -163,19 +152,16 @@ function setupTrackingEngine(ctx, mode, modeLabel) {
         alertFired: false 
     });
 
-    ctx.reply(`🚀 **Tracking Active!**\n⚙️ Operation: \`[${modeLabel}]\` \nScanning changes every 15 seconds...`);
+    ctx.reply(`🚀 **Deep Monitoring Active!**\n⚙️ Mode: \`[${modeLabel}]\` \nHar 15 second me precise scanning chal rahi hai...`);
     checkFinancialFluctuations(ctx, chatId, pid, fkLink, mode);
 }
 
-// --- COMMAND: LIST TRACK ---
 bot.command('list_track', (ctx) => {
     const userId = ctx.from.id.toString();
     if (!isUserApproved(userId)) return ctx.reply("❌ Access Denied!");
     
     const chatId = ctx.chat.id.toString();
-    if (!activeUsers[chatId] || activeUsers[chatId].length === 0) {
-        return ctx.reply("😴 Koyi active links abhi track nahi ho rahe hain.");
-    }
+    if (!activeUsers[chatId] || activeUsers[chatId].length === 0) return ctx.reply("😴 Koyi active links nahi hain.");
     
     let msg = "📋 **Aapki Running Tracking Matrix:**\n\n";
     activeUsers[chatId].forEach((item, index) => {
@@ -184,22 +170,18 @@ bot.command('list_track', (ctx) => {
     ctx.reply(msg, { parse_mode: 'Markdown', disable_web_page_preview: true });
 });
 
-// --- COMMAND: STOP ALL ---
 bot.command('stop_all', (ctx) => {
     const userId = ctx.from.id.toString();
     if (!isUserApproved(userId)) return ctx.reply("❌ Access Denied!");
-    
     const chatId = ctx.chat.id.toString();
     if (activeUsers[chatId] && activeUsers[chatId].length > 0) {
         activeUsers[chatId].forEach(item => clearInterval(item.interval));
         delete activeUsers[chatId];
-        ctx.reply("🛑 Saari active tracking links instantly band kar di gayi hain.");
-    } else { 
-        ctx.reply("⚠️ Koyi active tracking nahi chal rahi hai."); 
-    }
+        ctx.reply("🛑 Saari tracking band kar di gayi.");
+    } else { ctx.reply("⚠️ Koyi active tracking nahi mili."); }
 });
 
-// --- ADMIN CONTROL MANAGEMENT commands ---
+// Admin panels
 bot.command('approve', (ctx) => {
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) return;
     const args = ctx.message.text.split(' ').filter(arg => arg.trim() !== '');
@@ -235,7 +217,7 @@ bot.command('remove_user', (ctx) => {
     }
 });
 
-// --- 🔥 CORE FINANCIAL SCRAPER & NON-STOP ALERT ENGINE ---
+// --- 🔥 HIGH-FIDELITY DEEP FINANCIAL MONITOR SCRAPER ---
 async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
     if (!activeUsers[chatId]) return;
     const itemIndex = activeUsers[chatId].findIndex(item => item.id === pid);
@@ -252,17 +234,20 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
 
         const html = response.data;
         
+        // 1. Exact Price Scraper
         let currentPrice = "N/A";
         let priceMatch = html.match(/₹\s*[0-9,]+/);
         if (priceMatch) currentPrice = priceMatch[0].trim().replace(/[^0-9]/g, '');
 
+        // 2. Deep Numbers & % Bank Offer Extraction Logic
         let foundOffers = [];
-        const offerRegex = /(?:bank offer|instant discount| cashback|off on credit card|off on debit card)[^<]+/gi;
+        // Heavy multi-layer regex captures exact EMI terms, instant cash, percent metrics, and hard values
+        const deepOfferRegex = /(?:bank offer|instant discount| cashback|off on credit card|off on debit card|emi)[^<]+/gi;
         let match;
         let combinedOffersText = "";
         
-        while ((match = offerRegex.exec(html)) !== null && foundOffers.length < 4) {
-            let cleanOffer = match[0].replace(/<\/?[^>]+(>|$)/g, "").trim().substring(0, 80);
+        while ((match = deepOfferRegex.exec(html)) !== null && foundOffers.length < 5) {
+            let cleanOffer = match[0].replace(/<\/?[^>]+(>|$)/g, "").trim().substring(0, 100);
             if (cleanOffer.length > 10 && !foundOffers.includes(cleanOffer)) {
                 foundOffers.push(cleanOffer);
                 combinedOffersText += `🔹 ${cleanOffer}\n`;
@@ -272,7 +257,7 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
 
         let instance = activeUsers[chatId][itemIndex];
 
-        // Baseline lock
+        // Set baseline strings on very first loop execution
         if (!instance.lastPrice && !instance.lastOffers) {
             instance.lastPrice = currentPrice;
             instance.lastOffers = combinedOffersText;
@@ -285,26 +270,26 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
         if (mode === 'both') {
             if (currentPrice !== "N/A" && instance.lastPrice !== "N/A" && currentPrice !== instance.lastPrice) {
                 isFluctuationDetected = true;
-                alertMessageText = `💰 **PRICE FLUCTUATION DETECTED!** 💰\n\n📉 Old Price: ₹${instance.lastPrice}\n📈 New Price: ₹${currentPrice}`;
+                alertMessageText = `💰 **PRICE DROPPED / CHANGED!** 💰\n\n📉 Old Price: ₹${instance.lastPrice}\n📈 New Price: ₹${currentPrice}`;
             } else if (combinedOffersText !== instance.lastOffers) {
                 isFluctuationDetected = true;
-                alertMessageText = `💳 **BANK OFFER MATRIX CHANGED!** 💳\n\n📝 Old Offers:\n${instance.lastOffers}\n\n📝 New Current Offers:\n${combinedOffersText}`;
+                alertMessageText = `💳 **BANK OFFER VALUE / % FLUCTUATION!** 💳\n\n⚠️ *Bhai exact bank offers or numbers me badlav hua hai!*\n\n📝 Old Setup:\n${instance.lastOffers}\n\n📝 New Setup:\n${combinedOffersText}`;
             }
         } else if (mode === 'bankonly') {
             if (combinedOffersText !== instance.lastOffers) {
                 isFluctuationDetected = true;
-                alertMessageText = `💳 **BANK OFFER EXCLUSIVE MATRIX CHANGED!** 💳\n\n📝 Old Offers:\n${instance.lastOffers}\n\n📝 New Current Offers:\n${combinedOffersText}`;
+                alertMessageText = `💳 **BANK OFFER EXCLUSIVE BREAKDOWN CHANGED!** 💳\n\n📝 Old Values:\n${instance.lastOffers}\n\n📝 New Values:\n${combinedOffersText}`;
             }
         }
 
-        // --- RELENTLESS NAG LOOP (Spams alert every 15 secs once fluctuation triggers) ---
+        // --- RELENTLESS SPAMMING ALARM LOOP ---
         if (isFluctuationDetected || instance.alertFired === true) {
-            instance.alertFired = true; 
+            instance.alertFired = true; // Lock state for ongoing 15 sec nagging alerts
 
             let priceDisplay = currentPrice !== "N/A" ? `₹${currentPrice}` : "N/A";
             
             await bot.telegram.sendMessage(chatId, 
-                `🔥 **Oo bhaiiii price ya offers badal gya hai jldi ja lgake lgane!** 🔥\n\n${alertMessageText || '⚠️ *System Alert:* Fluctuations continuous!'}\n\n📊 **Current Live Snapshot:**\n💰 Price: *${priceDisplay}*\n🏛️ Offers Found:\n${combinedOffersText}\n\nLink:\n${originalUrl}`,
+                `🔥 **Oo bhaiiii price ya offers badal gya hai jldi ja lgake lgane!** 🔥\n\n${alertMessageText || '⚠️ *System Alert:* Numbers/Percentage changed live!'}\n\n📊 **Current Live Snapshot:**\n💰 Price: *${priceDisplay}*\n🏛️ Live Bank Terms:\n${combinedOffersText}\n\nLink:\n${originalUrl}`,
                 {
                     parse_mode: 'Markdown',
                     ...Markup.inlineKeyboard([[Markup.button.callback('Stop Tracking 🛑', `stop_fk_${itemIndex}`)]])
@@ -315,4 +300,4 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
     } catch (err) {}
 }
 
-bot.launch().then(() => console.log("Direct Command Master Engine Connected 24/7..."));
+bot.launch().then(() => console.log("Deep Financial Master System Online..."));
