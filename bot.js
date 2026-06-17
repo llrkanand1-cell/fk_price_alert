@@ -16,38 +16,39 @@ const bot = new Telegraf(BOT_TOKEN);
 const activeUsers = {};
 const userSessions = {}; // Handles user tracking state silently
 
-// Permanent Panel Buttons Layout
-const getProKeyboard = () => {
-    return Markup.keyboard([
-        ['🚀 Track Both', '🛵 Track Bank'],
-        ['📋 List Active', '🛑 Stop All Operations']
-    ]).resize();
-};
+// 🔥 HARD ENGINE CACHE: Baar-baar file read karne ke crash se bachane ke liye
+let approvedUsersCache = [];
 
-// --- 📂 HARD-LOCKED FILE DATABASE LOGIC ---
-function loadApprovedUsers() {
+// --- 📂 BULLET-PROOF DATABASE LOGIC ---
+function initDatabase() {
     try {
         if (!fs.existsSync(DB_FILE)) {
             const initialData = [ADMIN_CHAT_ID.toString()];
             fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2));
-            return initialData;
+            approvedUsersCache = initialData;
+            return;
         }
         const fileContent = fs.readFileSync(DB_FILE, 'utf8');
         if (!fileContent.trim()) {
-            return [ADMIN_CHAT_ID.toString()];
+            approvedUsersCache = [ADMIN_CHAT_ID.toString()];
+            return;
         }
         const users = JSON.parse(fileContent);
         if (!Array.isArray(users)) {
-            return [ADMIN_CHAT_ID.toString()];
+            approvedUsersCache = [ADMIN_CHAT_ID.toString()];
+            return;
         }
         if (!users.includes(ADMIN_CHAT_ID.toString())) {
             users.push(ADMIN_CHAT_ID.toString());
         }
-        return users.map(String);
+        approvedUsersCache = users.map(String);
     } catch (e) {
-        return [ADMIN_CHAT_ID.toString()];
+        approvedUsersCache = [ADMIN_CHAT_ID.toString()];
     }
 }
+
+// Initialize cache right away when script boots
+initDatabase();
 
 function saveApprovedUsers(usersList) {
     try {
@@ -55,13 +56,15 @@ function saveApprovedUsers(usersList) {
         if (!uniqueUsers.includes(ADMIN_CHAT_ID.toString())) {
             uniqueUsers.push(ADMIN_CHAT_ID.toString());
         }
+        approvedUsersCache = uniqueUsers; // Update RAM memory cache instantly
         fs.writeFileSync(DB_FILE, JSON.stringify(uniqueUsers, null, 2));
     } catch (e) {}
 }
 
 function isUserApproved(userId) {
     if (!userId) return false;
-    return loadApprovedUsers().includes(userId.toString());
+    // File read karne ke bajaye memory cache se load karega, zero downtime block!
+    return approvedUsersCache.includes(userId.toString());
 }
 // --------------------------------------------
 
@@ -75,12 +78,21 @@ setInterval(() => {
     axios.get(RENDER_URL).catch(() => {}); 
 }, 30000); 
 
+// Permanent Panel Buttons Layout
+const getProKeyboard = () => {
+    return Markup.keyboard([
+        ['🚀 Track Both', '🛵 Track Bank'],
+        ['📋 List Active', '🛑 Stop All Operations']
+    ]).resize();
+};
+
 // --- CALLBACK BUTTONS HANDLER ---
 bot.on('callback_query', async (ctx) => {
     const data = ctx.callbackQuery.data;
     const chatId = ctx.chat.id.toString();
     const clickerId = ctx.from.id.toString();
     
+    // 🔥 FIXED: Active List se 1st, 2nd, 3rd target manually udaane ka system
     if (data.startsWith('stop_fk_')) {
         const index = parseInt(data.split('_')[2]);
         if (activeUsers[chatId] && activeUsers[chatId][index]) {
@@ -97,12 +109,11 @@ bot.on('callback_query', async (ctx) => {
 
     if (clickerId !== ADMIN_CHAT_ID.toString()) return ctx.answerCbQuery("❌ Unauthorized!").catch(() => {});
     const targetUserId = data.split('_')[1].trim();
-    let currentList = loadApprovedUsers();
     
     if (data.startsWith('approve_')) {
-        if (!currentList.includes(targetUserId)) {
-            currentList.push(targetUserId);
-            saveApprovedUsers(currentList);
+        if (!approvedUsersCache.includes(targetUserId)) {
+            approvedUsersCache.push(targetUserId);
+            saveApprovedUsers(approvedUsersCache);
         }
         await ctx.editMessageText(`${ctx.callbackQuery.message.text}\n\n✅ **Mission Status: Agent Activated Permanently!**`).catch(() => {});
         await bot.telegram.sendMessage(targetUserId, "🎉 **Mubarak ho! Admin ne aapka secret access approve kar diya hai! Neeche diye gaye control panel se operation chalu karo.**", getProKeyboard()).catch(() => {});
@@ -118,7 +129,7 @@ bot.start((ctx) => {
     const name = `${ctx.from.first_name || ''}`.trim();
     
     if (isUserApproved(userId)) {
-        delete userSessions[userId]; 
+        delete userSessions[userId]; // Reset state
         return ctx.reply(`🤖 *Welcome Agent ${name}!* Secret Control Panel Activated!\n\nNeeche diye gaye buttons par click karke direct use karo boss! 😎`, getProKeyboard());
     }
     
@@ -155,7 +166,7 @@ bot.command('stop_all', (ctx) => { killAllOperations(ctx); });
 bot.hears('🛑 Stop All Operations', (ctx) => { killAllOperations(ctx); });
 
 
-// --- SMART INCOMING TEXT INTERCEPTOR ---
+// --- SMART INCOMING MESSAGE INTERCEPTOR ---
 bot.on('text', async (ctx) => {
     const userId = ctx.from.id.toString();
     if (!isUserApproved(userId)) return;
@@ -172,7 +183,7 @@ bot.on('text', async (ctx) => {
         let fkLink = args.find(arg => arg.includes('flipkart.com/'));
 
         if (!fkLink) {
-            return ctx.reply(`❌ **Abe saaf link bhejo Agent!**\nInput mein Flipkart ka link nahi mila. Dobara bhejien!`, getProKeyboard());
+            return ctx.reply(`❌ **Abe saaf link bhejo Agent!**\nInput mein Flipkart ka link nahi mila. Dobara sahi se link bhejo!`, getProKeyboard());
         }
 
         setupCoreScraperSystem(ctx, fkLink, mode, modeLabel);
@@ -185,7 +196,7 @@ bot.on('text', async (ctx) => {
 });
 
 
-// Helper core processors
+// Helper execution engine blocks
 function handleLegacyCommands(ctx, mode, modeLabel) {
     const args = ctx.message.text.replace(/\n/g, ' ').split(' ').filter(arg => arg.trim() !== '');
     let fkLink = args.find(arg => arg.includes('flipkart.com/'));
@@ -224,12 +235,12 @@ function setupCoreScraperSystem(ctx, fkLink, mode, modeLabel) {
         lastOffersRaw: []
     });
 
-    ctx.reply(`🕵️‍♂️ **Undercover Agent Active!**\n\nBhai, tu Flipkart waalon ke liye ek "secret spy" chhod raha hai. Woh log raat ko 2 baje bhi price badlenge ya bank discount ₹1500 se ₹2000 karenge na, toh tera bhai unki deewar kood kar tujhe khabar dega. \n\n☕ Chal ab tu aaram se jaake **chai-wai piyo ya mast neend poori karo**, unki lanka lagane ka kaam tere bhai par locked hai! 💣🚀`);
+    ctx.reply(`🕵️‍♂️ **Undercover Agent Active!**\n\nBhai, tu Flipkart waalon ke liye ek "secret spy" chhod raha hai. \n\n☕ Chal ab tu aaram se jaake **chai-wai piyo ya mast neend poori karo**, unki lanka lagane ka kaam tere bhai par locked hai! 💣🚀`);
 
     checkFinancialFluctuations(ctx, chatId, pid, fkLink, mode);
 }
 
-// 🔥 FIXED: Ekdum saaf format parser taaki list console par crash na ho
+// 🔥 FIXED: List Active ke saath dynamic individual stop buttons ka system add kar diya hai
 function displayActiveTracks(ctx) {
     const userId = ctx.from.id.toString();
     if (!isUserApproved(userId)) return;
@@ -276,7 +287,7 @@ function killAllOperations(ctx) {
     } else { ctx.reply("⚠️ Koyi active operation chal hi nahi rahi."); }
 }
 
-// --- ADMIN CONTROL ROOM COMMANDS ---
+// Admin commands
 bot.command('approve', (ctx) => {
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
         return ctx.reply("❌ **Warning! Identity Verification Failed.**\nAbe shaane, yeh command sirf asli Loot Master (Admin) ke fingerprint par khulti hai. Chal peeche hatt! 👮‍♂️🔥");
@@ -284,10 +295,10 @@ bot.command('approve', (ctx) => {
     const args = ctx.message.text.split(' ').filter(arg => arg.trim() !== '');
     if (args.length < 2) return ctx.reply("⚠️ Format: `/approve <user_id>`");
     const targetUserId = args[1].trim();
-    let currentList = loadApprovedUsers();
-    if (!currentList.includes(targetUserId)) {
-        currentList.push(targetUserId);
-        saveApprovedUsers(currentList);
+    
+    if (!approvedUsersCache.includes(targetUserId)) {
+        approvedUsersCache.push(targetUserId);
+        saveApprovedUsers(approvedUsersCache);
         ctx.reply(`✅ Agent \`${targetUserId}\` ko permanent mission access de diya gaya hai!`, { parse_mode: 'Markdown' });
     } else {
         ctx.reply("⚠️ Yeh ID pehle se hi approved list mein hai.");
@@ -298,9 +309,8 @@ bot.command('list_users', (ctx) => {
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
         return ctx.reply("❌ **Warning! Identity Verification Failed.**\nAbe shaane, yeh command sirf asli Loot Master (Admin) ke fingerprint par khulti hai. Chal peeche hatt! 👮‍♂️🔥");
     }
-    const currentList = loadApprovedUsers();
     let msg = "📋 **Approved Secret Agents Database List:**\n\n";
-    currentList.forEach(u => msg += `- \`${u}\`\n`);
+    approvedUsersCache.forEach(u => msg += `- \`${u}\`\n`);
     ctx.reply(msg, { parse_mode: 'Markdown' });
 });
 
@@ -312,25 +322,13 @@ bot.command('remove_user', (ctx) => {
     if (args.length < 2) return ctx.reply("⚠️ Format: `/remove_user <user_id>`");
     const targetUserId = args[1].trim();
     
-    if (targetUserId === ADMIN_CHAT_ID.toString()) {
-        return ctx.reply("⚠️ Abe khud ko hi thodi na remove kar doge master! 🤣");
-    }
-
-    let currentList = loadApprovedUsers();
-    const idx = currentList.indexOf(targetUserId);
+    const idx = approvedUsersCache.indexOf(targetUserId);
     if (idx !== -1) {
-        currentList.splice(idx, 1);
-        saveApprovedUsers(currentList);
-        
-        if (activeUsers[targetUserId]) {
-            activeUsers[targetUserId].forEach(item => clearInterval(item.interval));
-            delete activeUsers[targetUserId];
-        }
-        
-        ctx.reply(`❌ Agent \`${targetUserId}\` ka licence permanent cancel kar diya gaya hai aur data wipe kar diya hai!`, { parse_mode: 'Markdown' });
-        bot.telegram.sendMessage(targetUserId, "🔒 **Your session has been terminated by Admin.** Access revoked!").catch(() => {});
+        approvedUsersCache.splice(idx, 1);
+        saveApprovedUsers(approvedUsersCache);
+        ctx.reply(`❌ Agent \`${targetUserId}\` ka licence permanent cancel kar diya gaya hai.`, { parse_mode: 'Markdown' });
     } else {
-        ctx.reply("⚠️ Yeh ID agents ki approved database list mein nahi mili.");
+        ctx.reply("⚠️ Yeh ID agents ki list mein nahi mili.");
     }
 });
 
@@ -447,4 +445,4 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
     } catch (err) {}
 }
 
-bot.launch().then(() => console.log("Spy Control Room System Hardlocked Permanently..."));
+bot.launch().then(() => console.log("Spy Control Pro Anti-Crash Live..."));
