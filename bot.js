@@ -5,10 +5,10 @@ const fs = require('fs');
 const path = require('path');
 
 // --- 🔒 CONFIGURATION HARDLOCKED ---
-const BOT_TOKEN = '8980239383:AAFwZVEzP0lTYoIG3-HYig4xTz47L1n0lXY'; // 🔥 AAPKA ACTUAL PRICE ALERT TOKEN
-const ADMIN_CHAT_ID = '7485181331'; // Locked Master ID
+const BOT_TOKEN = '8980239383:AAFwZVEzP0lTYoIG3-HYig4xTz47L1n0lXY'; // Aapka exact correct token
+const ADMIN_CHAT_ID = '7485181331'; 
 const CHECK_INTERVAL = 30000; // 30 second precision loop
-const RENDER_URL = 'https://fk-financial-tracker.onrender.com'; // Is wale project ka exact URL
+const RENDER_URL = 'https://fk-financial-tracker.onrender.com'; 
 const DB_FILE = path.join(__dirname, 'database.json');
 // ----------------------------------------
 
@@ -55,7 +55,6 @@ function isUserApproved(userId) {
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// 🔥 TELEGRAF WEBHOOK MIDDLEWARE (Conflict 409 ko bypass karne ka permanent tarika)
 app.use(bot.webhookCallback('/secret-telegram-webhook'));
 
 app.get('/', (req, res) => res.status(200).send('Financial Core Engine Webhook Live!'));
@@ -63,11 +62,10 @@ app.get('/', (req, res) => res.status(200).send('Financial Core Engine Webhook L
 app.listen(PORT, '0.0.0.0', async () => {
     console.log(`🚀 Core Server listening on port ${PORT}`);
     try {
-        // Automatically tells Telegram to switch from long polling to Webhook
         await bot.telegram.setWebhook(`${RENDER_URL}/secret-telegram-webhook`, {
-            drop_pending_updates: true // Purane saare fasaaye hue fake updates mita dega
+            drop_pending_updates: true 
         });
-        console.log("🎯 Telegram Webhook binded successfully! Conflict bypassed permanently.");
+        console.log("🎯 Telegram Webhook binded successfully!");
     } catch (err) {
         console.log("⚠️ Webhook setup warning: ", err.message);
     }
@@ -84,22 +82,32 @@ const getProKeyboard = () => {
     ]).resize();
 };
 
+// 🔥 FIXED CALLBACK QUERY ENGINE FOR INLINE STOP BUTTONS
 bot.on('callback_query', async (ctx) => {
     const data = ctx.callbackQuery.data;
     const chatId = ctx.chat.id.toString();
     
     if (data.startsWith('stop_fk_')) {
         const index = parseInt(data.split('_')[2]);
+        
         if (activeUsers[chatId] && activeUsers[chatId][index]) {
             const removedItem = activeUsers[chatId][index];
+            
+            // Interval clear karke memory se hataezo
             clearInterval(removedItem.interval);
             activeUsers[chatId].splice(index, 1);
             
-            await ctx.answerCbQuery(`Target Stopped! 🛑`).catch(() => {});
-            await ctx.editMessageText(`🛑 <b>Tracking Permanent Stop!</b>`, { parse_mode: 'HTML' }).catch(() => {});
+            // Dynamic UI response update
+            await ctx.answerCbQuery(`Target [${index + 1}] Stopped! 🛑`).catch(() => {});
+            await ctx.editMessageText(`🛑 <b>Target [${index + 1}] radar se permanent saaf kar diya gaya hai!</b>\n\nAb is link ki tracking band ho chuki hai bhai.`, { parse_mode: 'HTML' }).catch(() => {});
+            return;
+        } else {
+            await ctx.answerCbQuery("⚠️ Target pehle se hi band hai ya delete ho chuka hai.").catch(() => {});
+            await ctx.editMessageText(`⚠️ <i>Yeh target pehle se hi saaf kiya ja chuka hai boss!</i>`, { parse_mode: 'HTML' }).catch(() => {});
             return;
         }
     }
+    await ctx.answerCbQuery().catch(() => {});
 });
 
 bot.start((ctx) => {
@@ -165,7 +173,7 @@ function setupCoreScraperSystem(ctx, fkLink, mode, modeLabel) {
 function displayActiveTracks(ctx) {
     const chatId = ctx.chat.id.toString();
     if (!activeUsers[chatId] || activeUsers[chatId].length === 0) return ctx.reply("😴 Koyi active target radar par nahi hai.");
-    let msg = "📋 <b>Active Targets:</b>\n\n";
+    let msg = "📋 <b>Active Targets Matrix:</b>\n\n";
     let keyboardButtons = [];
     activeUsers[chatId].forEach((item, index) => {
         msg += `🔢 <b>Target [${index + 1}]</b>\n⚙️ <b>Mode:</b> <code>[${item.mode}]</code>\n🔗 <b>Link:</b> ${item.url}\n\n`;
