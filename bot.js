@@ -5,16 +5,16 @@ const fs = require('fs');
 const path = require('path');
 
 // --- CONFIGURATION ---
-const BOT_TOKEN = '8980239383:AAFwZVEzP0lTYoIG3-HYig4xTz47L1n0lXY'; // 🔥 NAYA FRESH TOKEN FIXED!
+const BOT_TOKEN = '8980239383:AAFwZVEzP0lTYoIG3-HYig4xTz47L1n0lXY'; // Fresh Token Locked
 const ADMIN_CHAT_ID = '7485181331'; // Admin Chat ID Fixed
-const CHECK_INTERVAL = 15000; // Har 15 second me dynamic monitoring loop
-const RENDER_URL = 'https://instamart-tracker-bot.onrender.com/'; // Render URL template setup
+const CHECK_INTERVAL = 15000; // Har 15 second me price/bank offer check loop
+const RENDER_URL = 'https://instamart-tracker-bot.onrender.com/'; // Aapka Render Web Service URL
 const DB_FILE = path.join(__dirname, 'database.json');
 // ---------------------
 
 const bot = new Telegraf(BOT_TOKEN);
 const activeUsers = {};
-const sessionSetup = {}; // Dynamic multi-option state tracker
+const sessionSetup = {}; // Temporary session for multi-option setup
 
 // --- 📂 PERMANENT FILE DATABASE LOGIC ---
 function loadApprovedUsers() {
@@ -50,13 +50,18 @@ function isUserApproved(userId) {
 
 const app = express();
 const PORT = process.env.PORT || 10000;
-app.get('/', (req, res) => res.status(200).send('Financial Engine Running Live!'));
+app.get('/', (req, res) => res.status(200).send('Financial Engine Running Live 24/7!'));
 app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Port Binding Successful on ${PORT}`));
 
-// 🔥 ALIVE JHATKA SYSTEM
+// 🔥🔥🔥 30-SECOND NON-STOP JHATKA SYSTEM (ANTI-SLEEP LOOP) 🔥🔥🔥
+// Yeh loop har 30 second me server ko ping karega taaki Render kabhi bhi sleep mode me na jaye!
 setInterval(() => {
-    axios.get(RENDER_URL).catch(() => {}); 
+    console.log("⚡ [Jhatka System] Sending self-ping to keep server hot and alive 24/7...");
+    axios.get(RENDER_URL)
+        .then(() => console.log("✅ [Jhatka System] Server is blazing hot and active!"))
+        .catch((err) => console.log("⚠️ [Jhatka System] Self-ping heartbeat recorded.")); 
 }, 30000); 
+// ---------------------------------------------------------------------
 
 // --- CALLBACK BUTTONS HANDLER ---
 bot.on('callback_query', async (ctx) => {
@@ -64,7 +69,7 @@ bot.on('callback_query', async (ctx) => {
     const chatId = ctx.chat.id.toString();
     const clickerId = ctx.from.id.toString();
     
-    // Stop single tracker logic button
+    // Stop single tracker logic
     if (data.startsWith('stop_fk_')) {
         const index = parseInt(data.split('_')[2]);
         if (activeUsers[chatId] && activeUsers[chatId][index]) {
@@ -77,7 +82,7 @@ bot.on('callback_query', async (ctx) => {
         return ctx.answerCbQuery("⚠️ Already stopped.").catch(() => {});
     }
 
-    // Interactive configuration setup mode
+    // Interactive mode config buttons
     if (data.startsWith('setmode_')) {
         const parts = data.split('_');
         const mode = parts[1]; 
@@ -113,7 +118,7 @@ bot.on('callback_query', async (ctx) => {
         return ctx.answerCbQuery().catch(() => {});
     }
 
-    // Admin validation panel
+    // Admin validation
     if (clickerId !== ADMIN_CHAT_ID.toString()) {
         return ctx.answerCbQuery("❌ Unauthorized!").catch(() => {});
     }
@@ -127,7 +132,7 @@ bot.on('callback_query', async (ctx) => {
             saveApprovedUsers(currentList);
         }
         await ctx.editMessageText(`${ctx.callbackQuery.message.text}\n\n✅ **Status: Approved Permanently!**`).catch(() => {});
-        await bot.telegram.sendMessage(targetUserId, "🎉 **Mubarak ho! Admin ne aapka access approve kar diya hai!**\n\nAb aap permanent approved hain.\n👉 Track karne ke liye input format:\n`/start_track <Flipkart_URL>`", { parse_mode: 'Markdown' }).catch(() => {});
+        await bot.telegram.sendMessage(targetUserId, "🎉 **Mubarak ho! Admin ne aapka access approve kar diya hai!**\n\n👉 Track karne ke liye input format:\n`/start_track <Flipkart_URL>`", { parse_mode: 'Markdown' }).catch(() => {});
     } else if (data.startsWith('decline_')) {
         await ctx.editMessageText(`${ctx.callbackQuery.message.text}\n\n❌ **Status: Declined!**`).catch(() => {});
     }
@@ -140,7 +145,7 @@ bot.start((ctx) => {
     const name = `${ctx.from.first_name || ''}`.trim();
     
     if (isUserApproved(userId)) {
-        return ctx.reply(`🤖 *Welcome ${name}!* Financial Master Tracker Engine Live!\n\n🔹 **Control Options:**\n🚀 \`/start_track <Flipkart_URL>\` — Lagaen naya link\n📋 \`/list_track\` — Check running configuration matrix\n🛑 \`/stop_all\` — Clear all tracks instantly`, { parse_mode: 'Markdown' });
+        return ctx.reply(`🤖 *Welcome ${name}!* Financial Master Tracker Engine Live 24/7!\n\n🔹 **Control Options:**\n🚀 \`/start_track <Flipkart_URL>\` — Lagaen naya link\n📋 \`/list_track\` — Check running configuration matrix\n🛑 \`/stop_all\` — Clear all tracks instantly\n\n👑 **Admin Commands:**\n📋 \`/list_users\` — Approved users list\n❌ \`/remove_user <ID>\` — Delete user access`, { parse_mode: 'Markdown' });
     }
     
     ctx.reply(`🔒 **Access Denied!** ID: \`${userId}\` \nAdmin ke paas approval request bhej di gayi hai.`);
@@ -150,7 +155,7 @@ bot.start((ctx) => {
     }).catch(() => {});
 });
 
-// --- COMMAND: START TRACK (With Mode Inline Dialog) ---
+// --- COMMAND: START TRACK ---
 bot.command('start_track', async (ctx) => {
     const userId = ctx.from.id.toString();
     if (!isUserApproved(userId)) return ctx.reply("❌ Access Denied!");
@@ -215,7 +220,7 @@ bot.command('stop_all', (ctx) => {
     }
 });
 
-// Admin structural core features
+// Admin structural features
 bot.command('approve', (ctx) => {
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) return;
     const args = ctx.message.text.split(' ').filter(arg => arg.trim() !== '');
@@ -333,4 +338,4 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
     }
 }
 
-bot.launch().then(() => console.log("Fresh Naya Financial Master Bot Live..."));
+bot.launch().then(() => console.log("Fresh Naya Financial Master Bot Live 24/7..."));
