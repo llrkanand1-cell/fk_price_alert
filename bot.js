@@ -119,7 +119,6 @@ function setupTrackingEngine(ctx, mode, modeLabel) {
     
     let fkLink = args.find(arg => arg.includes('flipkart.com/'));
     
-    // Funny Check agar bina link ke command bhej de
     if (!fkLink) return ctx.reply(`🕵️‍♂️ **Abe shaane agent, bandook le aaya par goli (link) kahan hai?**\nCommand ke aage space dekar Flipkart ka link toh chipka pehle! 🤐`, { parse_mode: 'Markdown' });
     
     let pid = "";
@@ -150,7 +149,6 @@ function setupTrackingEngine(ctx, mode, modeLabel) {
         lastOffersRaw: []
     });
 
-    // 🔥🔥🔥 EXCLUSIVE UNDERCOVER AGENT MODE ACTIVATION DIALOGUE 🔥🔥🔥
     ctx.reply(`🕵️‍♂️ **Undercover Agent Active!**\n\nBhai, tu Flipkart waalon ke liye ek "secret spy" chhod raha hai. Woh log raat ko 2 baje bhi price badlenge ya bank discount ₹1500 se ₹2000 karenge na, toh tera bhai unki deewar kood kar tujhe khabar dega. \n\n☕ Chal ab tu aaram se jaake **chai-wai piyo ya mast neend poori karo**, unki lanka lagane ka kaam tere bhai par locked hai! 💣🚀`);
 
     checkFinancialFluctuations(ctx, chatId, pid, fkLink, mode);
@@ -177,7 +175,7 @@ bot.command('stop_all', (ctx) => {
         activeUsers[chatId].forEach(item => clearInterval(item.interval));
         delete activeUsers[chatId];
         ctx.reply("🛑 Saare undercover agents ko headquarter wapas bula liya gya hai! Matrix cleared.");
-    } else { ctx.reply("⚠️ Koyi active operation chal hi nahi raha."); }
+    } else { ctx.reply("⚠️ Koyi active tracking chal hi nahi rahi."); }
 });
 
 // Admin commands with denied alerts
@@ -235,7 +233,7 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
     try {
         const response = await axios.get(originalUrl, {
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, Scientific/Gecko) Chrome/122.0.0.0 Safari/537.36',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
             },
             timeout: 12000 
@@ -302,7 +300,8 @@ async function checkFinancialFluctuations(ctx, chatId, pid, originalUrl, mode) {
             let addedOffers = currentOffersRaw.filter(x => !instance.lastOffersRaw.includes(x));
             let removedOffers = instance.lastOffersRaw.filter(x => !currentOffersRaw.includes(x));
 
-            let offerChangeMsg = ``💳 **BANK OFFER TEXT/VALUE CHANGED:**\n`;
+            // ✨ FIXED: Faltu backtick hatakar string token bilkul correct kar diya hai yahan par
+            let offerChangeMsg = `💳 **BANK OFFER TEXT/VALUE CHANGED:**\n`;
             if (addedOffers.length > 0) {
                 offerChangeMsg += `✅ **Naya Offer Add Hua:**\n${addedOffers.map(o => `👉 ${o}`).join('\n')}\n`;
             }
