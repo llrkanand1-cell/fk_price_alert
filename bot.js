@@ -269,11 +269,13 @@ bot.command('list_users', (ctx) => {
     ctx.reply(msg, { parse_mode: 'Markdown' });
 });
 
-// --- 🔥 UPDATED: REMOVE USER WITH NOTIFICATION & WORKER CLEANUP 🔥 ---
+// --- 🔥 FIXED & GUARANTEED REMOVE USER SYSTEM ---
 bot.command('remove_user', async (ctx) => {
+    // 1. Admin Verification Check
     if (ctx.from.id.toString() !== ADMIN_CHAT_ID.toString()) {
         return ctx.reply("❌ **Warning! Identity Verification Failed.**\nAbe shaane, yeh command sirf asli Loot Master (Admin) ke fingerprint par khulti hai. Chal peeche hatt! 👮‍♂️🔥");
     }
+
     const args = ctx.message.text.split(' ').filter(arg => arg.trim() !== '');
     if (args.length < 2) return ctx.reply("⚠️ Format: `/remove_user <user_id>`");
     
@@ -282,29 +284,38 @@ bot.command('remove_user', async (ctx) => {
     const idx = currentList.indexOf(targetUserId);
     
     if (idx !== -1) {
-        // 1. Database se remove karo
+        // 2. Local Database (JSON File) se data remove karo
         currentList.splice(idx, 1);
         saveApprovedUsers(currentList);
         
-        // 2. Us user ke background me chal rahe saare tracker intervals clear karo
-        if (activeUsers[targetUserId] && activeUsers[targetUserId].length > 0) {
-            activeUsers[targetUserId].forEach(item => clearInterval(item.interval));
-            delete activeUsers[targetUserId];
-        }
+        // 3. Active RAM se uske chal rahe saare background web-scraping tracking tasks ko KILL karo
+        const idFormatsToClear = [targetUserId, targetUserId.toString()];
+        idFormatsToClear.forEach(id => {
+            if (activeUsers[id] && activeUsers[id].length > 0) {
+                activeUsers[id].forEach(item => {
+                    clearInterval(item.interval); // Har ek chal rahe interval ko turnat band karo
+                });
+                delete activeUsers[id]; // Active Object memory se saaf
+            }
+        });
+        
+        // Input tracking cache clear karo
         if (userSessions[targetUserId]) delete userSessions[targetUserId];
 
-        // 3. Admin ko reply bhejo
-        ctx.reply(`❌ Agent \`${targetUserId}\` ka licence permanent cancel kar diya gaya hai aur uski tracking matrix destroy kar di gayi hai.`, { parse_mode: 'Markdown' });
+        // 4. ✅ ADMIN KO CONFIRMATION MESSAGE (Jo pehle nahi aa raha tha)
+        ctx.reply(`✅ **Operation Successful!**\n\nAgent \`${targetUserId}\` ka access permanent cancel kar diya gaya hai aur uske saare chal rahe live links background se destroy kar diye gaye hain! ⚡💥`, { parse_mode: 'Markdown' });
         
-        // 4. 🔥 Target User ko warning message bhejo aur unka keyboard normal remove karo
+        // 5. 🔔 SAMNE WALE USER KO ALERT + BUTTONS GAYAB
         bot.telegram.sendMessage(
             targetUserId, 
-            "⚠️ **bhai admin ne tera access hata diya hai** 🚫\n\nAb aap is bot ke khufiya feature use nahi kar sakte.",
-            Markup.removeKeyboard() // Control panel buttons gayab karne ke liye
-        ).catch(() => {});
+            "⚠️ **bhai admin ne tera access hata diya hai** 🚫\n\nAb aap is bot ke khufiya features aur control panel use nahi kar sakte.",
+            Markup.removeKeyboard() // Yeh line user ke telegram chat screen se bade buttons ko hata degi
+        ).catch((err) => {
+            console.log(`Bande tak warning msg nahi pohancha sake (Aksar bot stop/block karne par): ${err.message}`);
+        });
         
     } else {
-        ctx.reply("⚠️ Yeh ID agents ki list mein nahi mili.");
+        ctx.reply("⚠️ Yeh ID approved agents ki list mein nahi mili. Database check karo boss!");
     }
 });
 
